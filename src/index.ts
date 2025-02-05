@@ -21,7 +21,7 @@ function splitArray<T>(array: T[], chunkSize: number): T[][] {
 
 gameboy.loadRom(rom)
 
-for (let i=0; i < 2000; i++) {
+for (let i=0; i < 1800; i++) {
 	gameboy.doFrame()
 }
 //gameboy.pressKey(Gameboy.KEYMAP.START)
