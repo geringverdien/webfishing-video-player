@@ -127,6 +127,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/pngjs@npm:^6.0.5":
+  version: 6.0.5
+  resolution: "@types/pngjs@npm:6.0.5"
+  dependencies:
+    "@types/node": "npm:*"
+  checksum: 10c0/11979d0690e774046d3a1e8cfc613a6b53a613909d81c93831cf253800e93ba1a2d47950979b523aebd4fc023351b644d7f4aa2dfcc027c70816a2968420e7da
+  languageName: node
+  linkType: hard
+
 "@types/ws@npm:^8":
   version: 8.5.14
   resolution: "@types/ws@npm:8.5.14"
@@ -473,10 +482,12 @@ __metadata:
   resolution: "gameboy-emulator@workspace:."
   dependencies:
     "@types/node": "npm:^22.13.1"
+    "@types/pngjs": "npm:^6.0.5"
     "@types/ws": "npm:^8"
     fs: "npm:^0.0.1-security"
     nodemon: "npm:^3.1.9"
     path: "npm:^0.12.7"
+    pngjs: "npm:^7.0.0"
     serverboy: "npm:^0.0.7"
     ts-node: "npm:^10.9.2"
     typescript: "npm:^5.7.3"
@@ -917,6 +928,13 @@ __metadata:
   version: 2.3.1
   resolution: "picomatch@npm:2.3.1"
   checksum: 10c0/26c02b8d06f03206fc2ab8d16f19960f2ff9e81a658f831ecb656d8f17d9edc799e8364b1f4a7873e89d9702dff96204be0fa26fe4181f6843f040f819dac4be
+  languageName: node
+  linkType: hard
+
+"pngjs@npm:^7.0.0":
+  version: 7.0.0
+  resolution: "pngjs@npm:7.0.0"
+  checksum: 10c0/0d4c7a0fd476a9c33df7d0a2a73e1d56537628a668841f6995c2bca070cf30819f9254a64363266bc14ef2fee47659dd3b4f2b18eec7ab65143015139f497b38
   languageName: node
   linkType: hard
 
