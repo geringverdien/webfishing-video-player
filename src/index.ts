@@ -4,7 +4,7 @@ import "ws";
 import * as path from "path";
 
 const gameboy = new Gameboy();
-const romName = "pokemon_crystal.gbc"
+const romName = "pokecrystal.gbc"
 const romPath = path.join(__dirname, "..", "roms", romName);
 const rom = readFileSync(romPath)
 
