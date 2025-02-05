@@ -13,6 +13,5 @@ const WIDTH = 160, HEIGHT = 144
 gameboy.loadRom(rom)
 
 gameboy.doFrame()
-
-
-console.log(gameboy);
+var screencap = gameboy.getScreen()
+console.log(screencap);
