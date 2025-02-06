@@ -1,6 +1,6 @@
 extends Node
 
-# IJKL UO to move, . to teleport to you
+# IJKL UO to move, arrow keys to rotate, . to teleport to you
 const targetName = "me" # target or "me"
 var speed = 2 # slow enough to move others
 var fastSpeed = 4 # faster but slow enough to move self
