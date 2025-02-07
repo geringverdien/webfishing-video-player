@@ -4,8 +4,8 @@ extends Node
 const port = 24893
 var speed = 2 # slow enough to move others
 var fastSpeed = 4 # faster but slow enough to move self
-var rotateSpeed = 25 # rotation speed
-var fastRotateSpeed = 100
+var rotateSpeed = 1500 # rotation speed
+var fastRotateSpeed = 3000
 
 var offset = Vector3(0,-1,0) # account for player height of 1
 
@@ -31,7 +31,7 @@ var special = [
 var lp
 
 var server
-var clients = []
+var clients = {}
 
 var moveVector = Vector3.ZERO
 var rotateVector = Vector3.ZERO
@@ -43,7 +43,7 @@ var screenActor
 var canvasNode
 var tilemap
 
-var oldMessages = ""
+var oldMessages = Network.LOCAL_GAMECHAT_COLLECTIONS.duplicate()
 
 func _ready():
 	lp = PlayerAPI.local_player
@@ -77,22 +77,26 @@ func updateCanvas(canvasData):
 	Network._send_P2P_Packet({"type": "chalk_packet", "data": canvasData, "canvas_id": screenActorID}, "peers", 2, Network.CHANNELS.CHALK)
 
 func logChat():
-	var value = Network.LOCAL_GAMECHAT_COLLECTIONS
-	var content = str(value)
-	var last_index = content.rfind("]: ")
-	if last_index != -1:
-		content = content.substr(last_index + 3)
+	var collection = Network.LOCAL_GAMECHAT_COLLECTIONS
 	
-	if content != oldMessages:
-		oldMessages = content
-		if content.length() > 0:
-			content = content.substr(0, content.length() - 1)
+	if len(collection) == 0: return
+	if collection == oldMessages: 
+		return
+	
+	
+	oldMessages = collection.duplicate()
+	var newMessage = collection[len(collection)-1]
+	var tagSplit = newMessage.split("[/color]")
+	if len(tagSplit) < 3: return
+	var message = tagSplit[2].to_lower()
+	message = message.substr(2)
+	#OS.clipboard = message
 
-		var validCommands = ["u", "d", "l", "r", "a", "b", "select", "start"]
-		content = content.to_lower()
+	var validCommands = ["u", "up", "d", "down", "l", "left", "r", "right", "a", "b", "select", "start"]
 
-		if content in validCommands:
-			handleInput(content)
+	if message in validCommands:
+		print("ran command " + message)
+		handleInput(message)
 
 	
 	
@@ -100,11 +104,19 @@ func handleInput(content):
 	match content:
 		"u":
 			sendInput("UP")
+		"up":
+			sendInput("UP")
 		"d":
+			sendInput("DOWN")
+		"down":
 			sendInput("DOWN")
 		"l":
 			sendInput("LEFT")
+		"left":
+			sendInput("LEFT")
 		"r":
+			sendInput("RIGHT")
+		"right":
 			sendInput("RIGHT")
 		"a":
 			sendInput("A")
@@ -173,20 +185,20 @@ func _input(event): # this sucks
 				rotateSpeed = oldRotateSpeed
 
 func _physics_process(delta):
+	# Calculate movement vector
 	moveVector.x = (inputValues["J"] - inputValues["L"]) * delta * speed
 	moveVector.y = (inputValues["O"] - inputValues["U"]) * delta * speed
 	moveVector.z = (inputValues["I"] - inputValues["K"]) * delta * speed
 
-	rotateVector.y = deg2rad((inputValues["left"] - inputValues["right"]) * delta * rotateSpeed)
-	rotateVector.x = deg2rad((inputValues["down"] - inputValues["up"]) * delta * rotateSpeed)
+	var yaw = deg2rad((inputValues["left"] - inputValues["right"]) * delta * rotateSpeed)
+	var pitch = deg2rad((inputValues["down"] - inputValues["up"]) * delta * rotateSpeed)
 
-
-	if (moveVector == Vector3.ZERO and rotateVector == Vector3.ZERO): return
+	if moveVector == Vector3.ZERO and (yaw == 0 and pitch == 0): return
 	if lp.busy: return
-	
-	
+
 	screenActor.global_transform.origin += moveVector
-	screenActor.global_rotation += rotateVector
+	screenActor.rotate(Vector3.UP, deg2rad(yaw))
+	screenActor.rotate_object_local(Vector3.RIGHT, deg2rad(pitch))
 
 func _process(d):
 	logChat()
@@ -229,9 +241,9 @@ func clearProps():
 func initWebsocket():
 	print("ws init")
 	server = WebSocketServer.new()
-	server.connect("connection_closed", self, "clientDisconnected")
-	server.connect("connection_error", self, "clientDisconnected")
-	server.connect("connection_established", self, "clientConnected")
+	server.connect("client_disconnected", self, "clientDisconnected")
+	server.connect("client_close_request", self, "clientRequestedClose")
+	server.connect("client_connected", self, "clientConnected")
 	server.connect("data_received", self, "onData")
 	
 	var err = server.listen(port)
@@ -242,24 +254,27 @@ func initWebsocket():
 	print("WebSocket Server started on port " + str(port))
 	set_process(true)
 
-func sendMessage(message, id=1):
-	if server.get_connection_status() == WebSocketClient.CONNECTION_CONNECTED:
-		server.get_peer(id).put_packet(message.to_utf8())
-		print(message)
-	else:
-		print("Not connected to server")
+func sendMessage(message):
+	if server.get_connection_status() != WebSocketClient.CONNECTION_CONNECTED: return
+	print(len(clients))
+	for clientID in clients.keys():
+		server.get_peer(int(clientID)).put_packet(message.to_utf8())
+		print("sent " + message + " to " + str(clientID))
 
-func sendInput(inputstr, id = 1):
-	server.get_peer(id).put_packet(("input|" + inputstr).to_utf8())
+func sendInput(inputstr):
+	sendMessage("input|" + inputstr)
 
 func clientConnected(id, protocol):
-		print("Client %d connected with protocol: %s" % [id, protocol])
-		clients[id] = true
-		#sendMessage(id, "Connection confirmed")
+	print("Client %d connected with protocol: %s" % [id, protocol])
+	clients[str(id)] = true
+	#sendMessage(id, "Connection confirmed")
 
 func clientDisconnected(id, was_clean = false):
-		print("Client %d disconnected, clean: %s" % [id, str(was_clean)])
-		clients.erase(id)
+	print("Client %d disconnected, clean: %s" % [id, str(was_clean)])
+	clients.erase(str(id))
+
+func clientRequestedClose(id, code, reason):
+	server.disconnect_peer(id, true)
 
 func onData(id = 1):
 	#print("Received data from client: ", id)

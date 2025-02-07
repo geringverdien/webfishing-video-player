@@ -6,15 +6,16 @@ import { PNG } from "pngjs";
 import { WebSocket } from "ws";
 import {deflate} from "pako"; 
 
-const PORT = 24893
-const WIDTH = 160, HEIGHT = 144 // gameboy resolution
+const PORT = 24893;
+const WIDTH = 160, HEIGHT = 144; // gameboy resolution
 const EMULATOR_HZ = 120; // Game Boy logic runs at 120Hz
 const FRAMERATE = 60
+const inputHoldTime = 10;
 
 const gameboy = new Gameboy();
-const romName: string = "pokemoncrystal.gbc"
+const romName: string = "pokemoncrystal.gbc";
 const romPath: string = path.join(__dirname, "..", "roms", romName);
-const rom = readFileSync(romPath)
+const rom = readFileSync(romPath);
 
 const colorPalette: { [key: number]: number[] } = {
 	0: [255, 238, 218], // white
@@ -23,13 +24,25 @@ const colorPalette: { [key: number]: number[] } = {
 	3: [0, 133, 131], // blue
 	4: [230, 157, 0], // yellow
 	6: [125, 162, 36], // green
-  };
+};
+
+var keyStates: {[keyName:string]: number} = {
+    "UP": 0,
+    "DOWN": 0,
+    "LEFT": 0,
+    "RIGHT": 0,
+    "B": 0,
+    "A": 0,
+    "START": 0,
+    "SELECT": 0
+};
 
 let frameCounter = 0;
 let shouldRender = false;
 var oldPixels = Array(23040)
 
 var keyInputs: string[] = []
+
 
 function createDataBuffer(pixelArray: number[]): ArrayBuffer {
     const changedPixels: Array<any> = [];
@@ -82,11 +95,28 @@ function findClosestColor(target: number[]): number {
 	  	if (distanceSq < minDistance) {
 			minDistance = distanceSq;
 			closestKey = Number(key);
-	  	}
+	    }
 	}
 
 	return closestKey;
-  }
+}
+
+function getPressedKeys(): number[] {
+    const currentlyPressed: number[] = [];
+
+    for (const [keyName, framesRemaining] of Object.entries(keyStates)) {
+        if (framesRemaining === 0) {
+            continue;
+        }
+        
+        keyStates[keyName] -= 1
+        const key = keyName as keyof typeof Gameboy.KEYMAP;
+
+        currentlyPressed.push(Gameboy.KEYMAP[key]);
+    }
+
+    return currentlyPressed;
+}
 
 gameboy.loadRom(rom)
 
@@ -106,43 +136,31 @@ socket.onopen = () => {
 
     const frameInterval = setInterval(() => {
     	for (let i = 0; i < stepsPerInterval; i++) {
+            gameboy.pressKeys(getPressedKeys())
             gameboy.doFrame();
-             /**
-	 		frameCounter++;
-      
-             if (frameCounter % 2 === 0) {
-                 shouldRender = true;
-                 frameCounter = 0;
-             }
-	 		*/
-         }
+        }
     
-         //if (!shouldRender) { return }
+        //if (!shouldRender) { return }
 		var frame: number[] = gameboy.getScreen()
 		var rawBuffer = createDataBuffer(frame)
 		var compressedBuffer = deflate(rawBuffer, { raw: false });
    
-		gameboy.pressKeys(keyInputs)
-		keyInputs = []
 		
-        //if (socket.readyState === WebSocket.OPEN) {
+		
+        if (socket.readyState !== WebSocket.OPEN) { return }
 	 	//console.log(socketData);
         socket.send(compressedBuffer);
-         //}
   
-         //shouldRender = false;
+        //shouldRender = false;
     }, intervalTime);
 
-	socket.onmessage = (data) => {
-		var message: string = data.toString()
-		console.log(message)
+	socket.onmessage = (event) => {
+		var message: string = event.data.toString()
+		console.log("MESSAGE: " + message)
 		var splitMessage: any[] = message.split("|")
 		if (splitMessage[0] == "input") {
 			var keyString: any = splitMessage[1]
-			var selectedKey = Gameboy.KEYMAP[keyString]
-			console.log(keyString)
-			console.log(selectedKey)
-			keyInputs.push(selectedKey)
+			keyStates[keyString] = inputHoldTime
 		};
 	}
 
