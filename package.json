@@ -3,6 +3,7 @@
   "packageManager": "yarn@4.5.2",
   "dependencies": {
     "fs": "^0.0.1-security",
+    "pako": "^2.1.0",
     "path": "^0.12.7",
     "pngjs": "^7.0.0",
     "serverboy": "^0.0.7",
@@ -12,6 +13,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.1",
+    "@types/pako": "^2",
     "@types/pngjs": "^6.0.5",
     "@types/ws": "^8",
     "nodemon": "^3.1.9"

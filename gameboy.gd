@@ -1,20 +1,13 @@
 extends Node
 
 # IJKL UO to move, arrow keys to rotate, . to teleport to you
-const targetName = "me" # target or "me"
+const port = 24893
 var speed = 2 # slow enough to move others
 var fastSpeed = 4 # faster but slow enough to move self
-var rotateSpeed = 1 # rotation speed
+var rotateSpeed = 25 # rotation speed
+var fastRotateSpeed = 100
 
 var offset = Vector3(0,-1,0) # account for player height of 1
-var chairPositions = [
-	[Vector3(0,  0, -1), Vector3(0,180,0)], # front
-	[Vector3(0,  0, 1), Vector3(0,0,0)], # back
-	[Vector3(1,  0, 0), Vector3(0,90,0)], # left
-	[Vector3(-1, 0, 0), Vector3(0,-90,0)], # right
-	[Vector3(0, 0.2, 0), Vector3(0,0,180)], # bottom
-]
-
 
 var inputValues = {
 	"I": 0,
@@ -35,16 +28,22 @@ var special = [
 	[0,199]
 ]
 
+var lp
+
+var server
+var clients = []
+
 var moveVector = Vector3.ZERO
 var rotateVector = Vector3.ZERO
-var props = []
 var oldSpeed = speed
-var lp
+var oldRotateSpeed = rotateSpeed
+
 var screenActorID
 var screenActor
 var canvasNode
 var tilemap
 
+var oldMessages = ""
 
 func _ready():
 	lp = PlayerAPI.local_player
@@ -58,17 +57,63 @@ func _ready():
 	updateTimer.wait_time = 0.1
 	updateTimer.connect("timeout", self, "posUpdate")
 	updateTimer.start()
+	initWebsocket()
 
-func _draw():
-	var rng = RandomNumberGenerator.new()
-	rng.randomize()
-	for y in range(200):
-		for x in range(200):
-			var randint = rng.randi_range(0,5)
-			if randint == 5: randint = 6
-			tilemap.set_cell(x,y, randint)
-	for pos in special:
-		tilemap.set_cell(pos[0],pos[1],5) #rainbow corners
+func handlePacket(data):
+	var canvasData = []
+	for pixelData in data:
+		var posX = pixelData[0] #+ 19 # center horizontally
+		var posY = pixelData[1] #+ 27 # center vertically
+		var colorTile = pixelData[2]
+		var constructedArray = [
+			Vector2(int(posX), int(posY)),
+			colorTile
+		]
+		canvasData.append(constructedArray)
+		tilemap.set_cell(posX,posY, colorTile)
+	updateCanvas(canvasData)
+
+func updateCanvas(canvasData):
+	Network._send_P2P_Packet({"type": "chalk_packet", "data": canvasData, "canvas_id": screenActorID}, "peers", 2, Network.CHANNELS.CHALK)
+
+func logChat():
+	var value = Network.LOCAL_GAMECHAT_COLLECTIONS
+	var content = str(value)
+	var last_index = content.rfind("]: ")
+	if last_index != -1:
+		content = content.substr(last_index + 3)
+	
+	if content != oldMessages:
+		oldMessages = content
+		if content.length() > 0:
+			content = content.substr(0, content.length() - 1)
+
+		var validCommands = ["u", "d", "l", "r", "a", "b", "select", "start"]
+		content = content.to_lower()
+
+		if content in validCommands:
+			handleInput(content)
+
+	
+	
+func handleInput(content):
+	match content:
+		"u":
+			sendInput("UP")
+		"d":
+			sendInput("DOWN")
+		"l":
+			sendInput("LEFT")
+		"r":
+			sendInput("RIGHT")
+		"a":
+			sendInput("A")
+		"b":
+			sendInput("B")
+		"select":
+			sendInput("SELECT")
+		"start":
+			sendInput("START")
 
 func _input(event): # this sucks
 	if not event is InputEventKey: return
@@ -96,6 +141,7 @@ func _input(event): # this sucks
 				inputValues["right"] = 1
 			KEY_SHIFT:
 				speed = fastSpeed
+				rotateSpeed = fastRotateSpeed
 
 			KEY_PERIOD:
 				if not lp.busy:
@@ -124,21 +170,29 @@ func _input(event): # this sucks
 				inputValues["right"] = 0
 			KEY_SHIFT:
 				speed = oldSpeed
+				rotateSpeed = oldRotateSpeed
 
 func _physics_process(delta):
 	moveVector.x = (inputValues["J"] - inputValues["L"]) * delta * speed
 	moveVector.y = (inputValues["O"] - inputValues["U"]) * delta * speed
 	moveVector.z = (inputValues["I"] - inputValues["K"]) * delta * speed
 
-	if moveVector == Vector3.ZERO: return
+	rotateVector.y = deg2rad((inputValues["left"] - inputValues["right"]) * delta * rotateSpeed)
+	rotateVector.x = deg2rad((inputValues["down"] - inputValues["up"]) * delta * rotateSpeed)
+
+
+	if (moveVector == Vector3.ZERO and rotateVector == Vector3.ZERO): return
 	if lp.busy: return
 	
-	moveVector.x = (inputValues["J"] - inputValues["L"]) * delta * speed
-	moveVector.y = (inputValues["O"] - inputValues["U"]) * delta * speed
-	moveVector.z = (inputValues["I"] - inputValues["K"]) * delta * speed
+	
+	screenActor.global_transform.origin += moveVector
+	screenActor.global_rotation += rotateVector
 
-	for prop in props:
-		prop.global_transform.origin += moveVector
+func _process(d):
+	logChat()
+	if not server: return
+	if server.is_listening():
+		server.poll()
 
 func posUpdate():
 	if moveVector == Vector3.ZERO: return
@@ -152,8 +206,9 @@ func posUpdate():
 		"peers", Network.CHANNELS.ACTOR_UPDATE)
 
 func spawnScreen(targetPos, zone):
-	screenActorID = Network._sync_create_actor("campfire", targetPos, zone, -1, Network.STEAM_ID, Vector3.ZERO)
+	screenActorID = Network._sync_create_actor("canvas", targetPos, zone, -1, Network.STEAM_ID, Vector3.ZERO)
 	for node in get_tree().get_nodes_in_group("actor"):
+		if not is_instance_valid(node): continue
 		if not node.actor_id == screenActorID: continue
 		screenActor = node
 		canvasNode = node.get_node("chalk_canvas")
@@ -164,16 +219,60 @@ func bringScreen():
 	screenActor.global_transform.origin = lp.global_transform.origin + offset
 	screenActor.global_rotation = Vector3.ZERO
 
-func spawnChair(pos, rotation, zone):
-	var rot = Vector3(deg2rad(rotation.x), deg2rad(rotation.y), deg2rad(rotation.z))
-	var chairID = Network._sync_create_actor("chair", pos, zone, -1, Network.STEAM_ID, rot)
-	for node in get_tree().get_nodes_in_group("actor"):
-		if not node.actor_id == chairID: continue
-		props.append(node)
-		#Network.OWNED_ACTORS.append(node)
-
 func clearProps():
 	for node in get_tree().get_nodes_in_group("actor"):
 		if not ("canvas" in node.name) and node.controlled: continue
 		Network._send_actor_action(node.actor_id, "_wipe_actor", [node.actor_id])
 		lp._wipe_actor(node.actor_id)
+
+
+func initWebsocket():
+	print("ws init")
+	server = WebSocketServer.new()
+	server.connect("connection_closed", self, "clientDisconnected")
+	server.connect("connection_error", self, "clientDisconnected")
+	server.connect("connection_established", self, "clientConnected")
+	server.connect("data_received", self, "onData")
+	
+	var err = server.listen(port)
+	if err != OK:
+		print("Unable to start server")
+		set_process(false)
+		return
+	print("WebSocket Server started on port " + str(port))
+	set_process(true)
+
+func sendMessage(message, id=1):
+	if server.get_connection_status() == WebSocketClient.CONNECTION_CONNECTED:
+		server.get_peer(id).put_packet(message.to_utf8())
+		print(message)
+	else:
+		print("Not connected to server")
+
+func sendInput(inputstr, id = 1):
+	server.get_peer(id).put_packet(("input|" + inputstr).to_utf8())
+
+func clientConnected(id, protocol):
+		print("Client %d connected with protocol: %s" % [id, protocol])
+		clients[id] = true
+		#sendMessage(id, "Connection confirmed")
+
+func clientDisconnected(id, was_clean = false):
+		print("Client %d disconnected, clean: %s" % [id, str(was_clean)])
+		clients.erase(id)
+
+func onData(id = 1):
+	#print("Received data from client: ", id)
+	var packet = server.get_peer(id).get_packet()
+	var decompressedPacket = packet.decompress_dynamic(-1, File.COMPRESSION_DEFLATE)
+	#print(decompressedPacket)
+	var convertedData = []
+	for i in range(0, decompressedPacket.size(), 3):
+		var x = decompressedPacket[i]
+		var y = decompressedPacket[i + 1]
+		var color = decompressedPacket[i + 2]
+		convertedData.append([x, y, color])
+	#print(convertedData)
+	#print(packet)
+	handlePacket(convertedData)
+	
