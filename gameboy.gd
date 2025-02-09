@@ -21,12 +21,6 @@ var inputValues = {
 	"left": 0,
 	"right": 0,
 }
-var special = [
-	[0,0],
-	[199,199],
-	[199,0],
-	[0,199]
-]
 
 var lp
 
@@ -90,17 +84,21 @@ func logChat():
 	if len(tagSplit) < 3: return
 	var message = tagSplit[2].to_lower()
 	message = message.substr(2)
+	#var spaceSplit = message.split(" ")
+	#var command = spaceSplit[0]
+	#var args = spaceSplit.slice(1, -1)
+	var sender = tagSplit[1].split("]")[1]
 	#OS.clipboard = message
 
-	var validCommands = ["u", "up", "d", "down", "l", "left", "r", "right", "a", "b", "select", "start"]
+	var validCommands = ["u", "up", "d", "down", "l", "left", "r", "right", "a", "b", "select", "start", "save", "speed"]
 
 	if message in validCommands:
-		print("ran command " + message)
-		handleInput(message)
+		#print("ran command " + message)
+		#handleInput(message, args, sender)
+		handleInput(message, sender)
+	
 
-	
-	
-func handleInput(content):
+func handleInput(content, sender, args = []):
 	match content:
 		"u":
 			sendInput("UP")
@@ -126,6 +124,14 @@ func handleInput(content):
 			sendInput("SELECT")
 		"start":
 			sendInput("START")
+		"save":
+			if not sender == Network.STEAM_USERNAME: return
+			requestSave()
+		"speed":
+			if not sender == Network.STEAM_USERNAME: return
+			var newSpeed = args[0]
+			setGameSpeed(newSpeed)
+
 
 func _input(event): # this sucks
 	if not event is InputEventKey: return
@@ -185,7 +191,6 @@ func _input(event): # this sucks
 				rotateSpeed = oldRotateSpeed
 
 func _physics_process(delta):
-	# Calculate movement vector
 	moveVector.x = (inputValues["J"] - inputValues["L"]) * delta * speed
 	moveVector.y = (inputValues["O"] - inputValues["U"]) * delta * speed
 	moveVector.z = (inputValues["I"] - inputValues["K"]) * delta * speed
@@ -239,19 +244,19 @@ func clearProps():
 
 
 func initWebsocket():
-	print("ws init")
+	#print("ws init")
 	server = WebSocketServer.new()
 	server.connect("client_disconnected", self, "clientDisconnected")
 	server.connect("client_close_request", self, "clientRequestedClose")
-	server.connect("client_connected", self, "clientConnected")
-	server.connect("data_received", self, "onData")
+	server.connect("client_connected ", self, "clientConnected")
+	server.connect("data_received", self, "onMessage")
 	
 	var err = server.listen(port)
 	if err != OK:
-		print("Unable to start server")
+		print("unable to start server")
 		set_process(false)
 		return
-	print("WebSocket Server started on port " + str(port))
+	print("websocket started on port " + str(port))
 	set_process(true)
 
 func sendMessage(message):
@@ -264,20 +269,27 @@ func sendMessage(message):
 func sendInput(inputstr):
 	sendMessage("input|" + inputstr)
 
+func requestSave():
+	sendMessage("savegame|")
+
+func setGameSpeed(gameSpeed):
+	sendMessage("setspeed|" + gameSpeed)
+
 func clientConnected(id, protocol):
 	print("Client %d connected with protocol: %s" % [id, protocol])
 	clients[str(id)] = true
 	#sendMessage(id, "Connection confirmed")
 
-func clientDisconnected(id, was_clean = false):
-	print("Client %d disconnected, clean: %s" % [id, str(was_clean)])
+func clientDisconnected(id, cleanExit):
+	print("client %d disconnected, clean: %s" % [id, str(cleanExit)])
 	clients.erase(str(id))
 
 func clientRequestedClose(id, code, reason):
 	server.disconnect_peer(id, true)
 
-func onData(id = 1):
+func onMessage(id):
 	#print("Received data from client: ", id)
+	clients[str(id)] = true # clientConnected magically stopped being fired
 	var packet = server.get_peer(id).get_packet()
 	var decompressedPacket = packet.decompress_dynamic(-1, File.COMPRESSION_DEFLATE)
 	#print(decompressedPacket)
