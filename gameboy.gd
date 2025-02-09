@@ -2,10 +2,10 @@ extends Node
 
 # IJKL UO to move, arrow keys to rotate, . to teleport to you
 const port = 24893
-var speed = 2 # slow enough to move others
-var fastSpeed = 4 # faster but slow enough to move self
+var moveSpeed = 2 # move speed
+var fastSpeed = 4 # shift speed
 var rotateSpeed = 1500 # rotation speed
-var fastRotateSpeed = 3000
+var fastRotateSpeed = 3000 # shift rotation speed
 
 var offset = Vector3(0,-1,0) # account for player height of 1
 
@@ -29,7 +29,7 @@ var clients = {}
 
 var moveVector = Vector3.ZERO
 var rotateVector = Vector3.ZERO
-var oldSpeed = speed
+var oldSpeed = moveSpeed
 var oldRotateSpeed = rotateSpeed
 
 var screenActorID
@@ -74,8 +74,7 @@ func logChat():
 	var collection = Network.LOCAL_GAMECHAT_COLLECTIONS
 	
 	if len(collection) == 0: return
-	if collection == oldMessages: 
-		return
+	if hash(collection) == hash(oldMessages): return
 	
 	
 	oldMessages = collection.duplicate()
@@ -84,21 +83,20 @@ func logChat():
 	if len(tagSplit) < 3: return
 	var message = tagSplit[2].to_lower()
 	message = message.substr(2)
-	#var spaceSplit = message.split(" ")
-	#var command = spaceSplit[0]
-	#var args = spaceSplit.slice(1, -1)
+	var spaceSplit = message.split(" ")
+	var command = spaceSplit[0]
+	spaceSplit.remove(0)
+	var args = spaceSplit
 	var sender = tagSplit[1].split("]")[1]
 	#OS.clipboard = message
 
 	var validCommands = ["u", "up", "d", "down", "l", "left", "r", "right", "a", "b", "select", "start", "save", "speed"]
 
-	if message in validCommands:
-		#print("ran command " + message)
-		#handleInput(message, args, sender)
-		handleInput(message, sender)
+	if command in validCommands:
+		handleInput(command, sender, args)
 	
 
-func handleInput(content, sender, args = []):
+func handleInput(content, sender, args):
 	match content:
 		"u":
 			sendInput("UP")
@@ -129,8 +127,8 @@ func handleInput(content, sender, args = []):
 			requestSave()
 		"speed":
 			if not sender == Network.STEAM_USERNAME: return
-			var newSpeed = args[0]
-			setGameSpeed(newSpeed)
+			print("speed: " + args[0])
+			setGameSpeed(args[0])
 
 
 func _input(event): # this sucks
@@ -158,7 +156,7 @@ func _input(event): # this sucks
 			KEY_RIGHT:
 				inputValues["right"] = 1
 			KEY_SHIFT:
-				speed = fastSpeed
+				moveSpeed = fastSpeed
 				rotateSpeed = fastRotateSpeed
 
 			KEY_PERIOD:
@@ -187,13 +185,13 @@ func _input(event): # this sucks
 			KEY_RIGHT:
 				inputValues["right"] = 0
 			KEY_SHIFT:
-				speed = oldSpeed
+				moveSpeed = oldSpeed
 				rotateSpeed = oldRotateSpeed
 
 func _physics_process(delta):
-	moveVector.x = (inputValues["J"] - inputValues["L"]) * delta * speed
-	moveVector.y = (inputValues["O"] - inputValues["U"]) * delta * speed
-	moveVector.z = (inputValues["I"] - inputValues["K"]) * delta * speed
+	moveVector.x = (inputValues["J"] - inputValues["L"]) * delta * moveSpeed
+	moveVector.y = (inputValues["O"] - inputValues["U"]) * delta * moveSpeed
+	moveVector.z = (inputValues["I"] - inputValues["K"]) * delta * moveSpeed
 
 	var yaw = deg2rad((inputValues["left"] - inputValues["right"]) * delta * rotateSpeed)
 	var pitch = deg2rad((inputValues["down"] - inputValues["up"]) * delta * rotateSpeed)
@@ -261,7 +259,7 @@ func initWebsocket():
 
 func sendMessage(message):
 	if server.get_connection_status() != WebSocketClient.CONNECTION_CONNECTED: return
-	print(len(clients))
+	#print(len(clients))
 	for clientID in clients.keys():
 		server.get_peer(int(clientID)).put_packet(message.to_utf8())
 		print("sent " + message + " to " + str(clientID))
@@ -273,10 +271,10 @@ func requestSave():
 	sendMessage("savegame|")
 
 func setGameSpeed(gameSpeed):
-	sendMessage("setspeed|" + gameSpeed)
+	sendMessage("setspeed|" + gameSpeed if gameSpeed != "" else "1")
 
 func clientConnected(id, protocol):
-	print("Client %d connected with protocol: %s" % [id, protocol])
+	print("client %d connected with protocol: %s" % [id, protocol])
 	clients[str(id)] = true
 	#sendMessage(id, "Connection confirmed")
 
