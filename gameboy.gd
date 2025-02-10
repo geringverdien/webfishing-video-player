@@ -276,7 +276,7 @@ func requestSave():
 func setGameSpeed(gameSpeed):
 	sendMessage("setspeed|" + gameSpeed if gameSpeed != "" else "1")
 
-func setHoldTime(holdTime)
+func setHoldTime(holdTime):
 	sendMessage("setholdtime|" + holdTime if holdTime != "" else "10")
 
 
