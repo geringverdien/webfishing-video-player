@@ -90,7 +90,7 @@ func logChat():
 	var sender = tagSplit[1].split("]")[1]
 	#OS.clipboard = message
 
-	var validCommands = ["u", "up", "d", "down", "l", "left", "r", "right", "a", "b", "select", "start", "save", "speed", "holdtime"]
+	var validCommands = ["u", "up", "d", "down", "l", "left", "r", "right", "a", "b", "select", "start", "save", "speed", "holdtime", "abort"]
 
 	if command in validCommands:
 		handleInput(command, sender, args)
@@ -132,6 +132,9 @@ func handleInput(content, sender, args):
 		"holdtime":
 			if not sender == Network.STEAM_USERNAME: return
 			setHoldTime(args[0])	
+		"abort":
+			if not sender == Network.STEAM_USERNAME: return
+			abort()
 
 
 func _input(event): # this sucks
@@ -243,6 +246,11 @@ func clearProps():
 		Network._send_actor_action(node.actor_id, "_wipe_actor", [node.actor_id])
 		lp._wipe_actor(node.actor_id)
 
+func abort():
+	clearProps()
+	set_process(false)
+	server.stop()
+	print("stopped the emulator. use the trashcan icon in Finapse to fully delete all script instances.")
 
 func initWebsocket():
 	#print("ws init")
