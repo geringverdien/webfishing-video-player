@@ -9,12 +9,12 @@ import {deflate} from "pako";
 const PORT = 24893;
 const WIDTH = 160, HEIGHT = 144; // gameboy resolution
 const EMULATOR_HZ = 120; // emulator runs at 120 refresh rate
-const FRAMERATE = 60; // gameboy runs at ~60 fps
+const FRAMERATE = 30; // gameboy runs at ~60 fps
 var inputHoldTime = 10;
-var gameSpeed = 1; // use ingame command "speed 2" to speed up, must be integer
+var gameSpeed = 1; // use ingame command "speed num" to speed up, must be integer
 
 const gameboy = new Gameboy();
-const romName: string = "tetris.gbc";
+const romName: string = "pokemoncrystal.gbc";
 const romPath: string = path.join(__dirname, "..", "roms", romName);
 const savePath: string = path.join(__dirname, "..", "saves", romName + ".sav")
 const rom = readFileSync(romPath);
@@ -115,7 +115,7 @@ function getPressedKeys(): number[] {
 
 		currentlyPressed.push(Gameboy.KEYMAP[key]);
 	}
-
+	if (currentlyPressed.length > 0) {console.log(currentlyPressed) };
 	return currentlyPressed;
 }
 
@@ -164,13 +164,14 @@ socket.onopen = () => {
 	const intervalTime = 1000 / FRAMERATE;
 	
 	const stepsPerInterval = EMULATOR_HZ / FRAMERATE;
+	var frameCount = 0
 
 	const frameInterval = setInterval(() => {
 		for (let i = 0; i < (stepsPerInterval * gameSpeed); i++) {
 			gameboy.pressKeys(getPressedKeys());
 			gameboy.doFrame();
 		}
-	
+
 		var frame: number[] = gameboy.getScreen();
 		var rawBuffer = createDataBuffer(frame);
 		var compressedBuffer = deflate(rawBuffer, { raw: false });
@@ -197,13 +198,16 @@ socket.onopen = () => {
 			case "savegame":
 				console.log("saving state")
 				storeSaveData()
+				break
 			case "setspeed":
 				const newSpeed = Math.floor(Number(args[0]));
 				console.log(`set speed to ${newSpeed}`);
 				gameSpeed = newSpeed;
+				break
 			case "setholdtime":
 				const newHoldTime = Math.floor(Number(args[0]));
 				inputHoldTime = newHoldTime;
+				break;
 		}
 	}
 

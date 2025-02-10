@@ -249,7 +249,7 @@ func initWebsocket():
 	server = WebSocketServer.new()
 	server.connect("client_disconnected", self, "clientDisconnected")
 	server.connect("client_close_request", self, "clientRequestedClose")
-	server.connect("client_connected ", self, "clientConnected")
+	server.connect("client_connected", self, "clientConnected")
 	server.connect("data_received", self, "onMessage")
 	
 	var err = server.listen(port)
@@ -283,7 +283,7 @@ func setHoldTime(holdTime):
 
 func clientConnected(id, protocol):
 	print("client %d connected with protocol: %s" % [id, protocol])
-	clients[str(id)] = true
+	clients[str(id)] = false
 	#sendMessage(id, "Connection confirmed")
 
 func clientDisconnected(id, cleanExit):
@@ -295,7 +295,6 @@ func clientRequestedClose(id, code, reason):
 
 func onMessage(id):
 	#print("Received data from client: ", id)
-	clients[str(id)] = true # clientConnected magically stopped being fired
 	var packet = server.get_peer(id).get_packet()
 	var decompressedPacket = packet.decompress_dynamic(-1, File.COMPRESSION_DEFLATE)
 	#print(decompressedPacket)
