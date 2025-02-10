@@ -90,7 +90,7 @@ func logChat():
 	var sender = tagSplit[1].split("]")[1]
 	#OS.clipboard = message
 
-	var validCommands = ["u", "up", "d", "down", "l", "left", "r", "right", "a", "b", "select", "start", "save", "speed"]
+	var validCommands = ["u", "up", "d", "down", "l", "left", "r", "right", "a", "b", "select", "start", "save", "speed", "holdtime"]
 
 	if command in validCommands:
 		handleInput(command, sender, args)
