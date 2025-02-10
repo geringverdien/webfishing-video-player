@@ -129,6 +129,9 @@ func handleInput(content, sender, args):
 			if not sender == Network.STEAM_USERNAME: return
 			print("speed: " + args[0])
 			setGameSpeed(args[0])
+		"holdtime":
+			if not sender == Network.STEAM_USERNAME: return
+			setHoldTime(args[0])	
 
 
 func _input(event): # this sucks
@@ -272,6 +275,11 @@ func requestSave():
 
 func setGameSpeed(gameSpeed):
 	sendMessage("setspeed|" + gameSpeed if gameSpeed != "" else "1")
+
+func setHoldTime(holdTime)
+	sendMessage("setholdtime|" + holdTime if holdTime != "" else "10")
+
+
 
 func clientConnected(id, protocol):
 	print("client %d connected with protocol: %s" % [id, protocol])
