@@ -22,6 +22,9 @@ var inputValues = {
 	"right": 0,
 }
 
+# commands for inputs, saving current SRAM to file, emulation speed, button hold time, fully removing the emulator
+var validCommands = ["u", "up", "d", "down", "l", "left", "r", "right", "a", "b", "select", "start", "save", "speed", "holdtime", "abort"]
+
 var lp
 
 var server
@@ -89,8 +92,6 @@ func logChat():
 	var args = spaceSplit
 	var sender = tagSplit[1].split("]")[1]
 	#OS.clipboard = message
-
-	var validCommands = ["u", "up", "d", "down", "l", "left", "r", "right", "a", "b", "select", "start", "save", "speed", "holdtime", "abort"]
 
 	if command in validCommands:
 		handleInput(command, sender, args)
