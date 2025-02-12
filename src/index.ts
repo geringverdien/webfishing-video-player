@@ -2,7 +2,7 @@ import Gameboy from "serverboy";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import "ws";
 import * as path from "path";
-import { PNG } from "pngjs";
+//import { PNG } from "pngjs";
 import { WebSocket } from "ws";
 import {deflate} from "pako"; 
 

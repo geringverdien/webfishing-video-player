@@ -23,7 +23,20 @@ var inputValues = {
 }
 
 # commands for inputs, saving current SRAM to file, emulation speed, button hold time, fully removing the emulator
-var validCommands = ["u", "up", "d", "down", "l", "left", "r", "right", "a", "b", "select", "start", "save", "speed", "holdtime", "abort"]
+var validCommands = [
+	"u", "up", # up
+	"d", "down", # down
+	"l", "left", # left
+	"r", "right", # right
+	"a", # A
+	"b", # B
+	"select", # Select
+	"start", # Start
+	"save", # saves sram to file, make sure the actual gameboy game has saved before using (e.g. start menu in pokemon)
+	"speed", # sets emulation speed to a supplied integer
+	"holdtime", # changes the amount of ticks that inputs are held down for, currently changes both dpad and other buttons
+	"abort" # stops the websocket, deletes the screen, sets processing to false. use the trashcan icon in finapse for a "full clear"
+]
 
 var lp
 
@@ -32,13 +45,13 @@ var clients = {}
 
 var moveVector = Vector3.ZERO
 var rotateVector = Vector3.ZERO
-var oldSpeed = moveSpeed
+var oldMoveSpeed = moveSpeed
 var oldRotateSpeed = rotateSpeed
 
 var screenActorID
 var screenActor
-var canvasNode
-var tilemap
+var screenCanvasNode
+var screenTileMap
 
 var oldMessages = Network.LOCAL_GAMECHAT_COLLECTIONS.duplicate()
 
@@ -67,7 +80,7 @@ func handlePacket(data):
 			colorTile
 		]
 		canvasData.append(constructedArray)
-		tilemap.set_cell(posX,posY, colorTile)
+		screenTileMap.set_cell(posX,posY, colorTile)
 	updateCanvas(canvasData)
 
 func updateCanvas(canvasData):
@@ -192,7 +205,7 @@ func _input(event): # this sucks
 			KEY_RIGHT:
 				inputValues["right"] = 0
 			KEY_SHIFT:
-				moveSpeed = oldSpeed
+				moveSpeed = oldMoveSpeed
 				rotateSpeed = oldRotateSpeed
 
 func _physics_process(delta):
@@ -233,8 +246,8 @@ func spawnScreen(targetPos, zone):
 		if not is_instance_valid(node): continue
 		if not node.actor_id == screenActorID: continue
 		screenActor = node
-		canvasNode = node.get_node("chalk_canvas")
-		tilemap = canvasNode.get_node("Viewport/TileMap")
+		screenCanvasNode = node.get_node("chalk_canvas")
+		screenTileMap = screenCanvasNode.get_node("Viewport/TileMap")
 		#Network.OWNED_ACTORS.append(node)
 
 func bringScreen():
