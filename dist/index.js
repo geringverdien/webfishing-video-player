@@ -40,16 +40,24 @@ const serverboy_1 = __importDefault(require("serverboy"));
 const fs_1 = require("fs");
 require("ws");
 const path = __importStar(require("path"));
+//import { PNG } from "pngjs";
 const ws_1 = require("ws");
 const pako_1 = require("pako");
 const PORT = 24893;
 const WIDTH = 160, HEIGHT = 144; // gameboy resolution
-const EMULATOR_HZ = 120; // Game Boy logic runs at 120Hz
-const FRAMERATE = 60;
+const EMULATOR_HZ = 120; // emulator runs at 120 refresh rate
+const FRAMERATE = 30; // gameboy runs at ~60 fps
+var inputHoldTime = 10;
+var gameSpeed = 1; // use ingame command "speed num" to speed up, must be integer
 const gameboy = new serverboy_1.default();
-const romName = "pokemoncrystal.gbc";
+const romName = "doom_demo.gbc";
 const romPath = path.join(__dirname, "..", "roms", romName);
+const savePath = path.join(__dirname, "..", "saves", romName + ".sav");
 const rom = (0, fs_1.readFileSync)(romPath);
+var saveData = null;
+if ((0, fs_1.existsSync)(savePath)) {
+    saveData = getSaveFile();
+}
 const colorPalette = {
     0: [255, 238, 218], // white
     1: [5, 11, 21], // black
@@ -58,10 +66,17 @@ const colorPalette = {
     4: [230, 157, 0], // yellow
     6: [125, 162, 36], // green
 };
-let frameCounter = 0;
-let shouldRender = false;
+var keyStates = {
+    "UP": 0,
+    "DOWN": 0,
+    "LEFT": 0,
+    "RIGHT": 0,
+    "B": 0,
+    "A": 0,
+    "START": 0,
+    "SELECT": 0
+};
 var oldPixels = Array(23040);
-var keyInputs = [];
 function createDataBuffer(pixelArray) {
     const changedPixels = [];
     for (let i = 0; i < pixelArray.length; i += 4) {
@@ -75,21 +90,18 @@ function createDataBuffer(pixelArray) {
         const b = pixelArray[i + 2];
         const colorPaletteIndex = findClosestColor([r, g, b]);
         if (oldPixels[pixelIndex] === colorPaletteIndex) {
-            //console.log("skipping");
             continue;
         }
-        ;
         oldPixels[pixelIndex] = colorPaletteIndex;
         changedPixels.push([x, y, colorPaletteIndex]);
     }
-    // Create a binary buffer
-    const buffer = new ArrayBuffer(changedPixels.length * 3); // 3 bytes per pixel (x, y, c)
+    const buffer = new ArrayBuffer(changedPixels.length * 3);
     const view = new Uint8Array(buffer);
     for (let i = 0; i < changedPixels.length; i++) {
         const pixel = changedPixels[i];
-        view[i * 3] = pixel[0]; // X-coordinate (1 byte)
-        view[i * 3 + 1] = pixel[1]; // Y-coordinate (1 byte)
-        view[i * 3 + 2] = pixel[2]; // Color index (1 byte)
+        view[i * 3] = pixel[0]; // x
+        view[i * 3 + 1] = pixel[1]; // y
+        view[i * 3 + 2] = pixel[2]; // color
     }
     return buffer;
 }
@@ -108,46 +120,95 @@ function findClosestColor(target) {
     }
     return closestKey;
 }
-gameboy.loadRom(rom);
-//console.log("skipping 2000 frames...")
-//
-//for (let i=0; i < 2000; i++) {
-//	gameboy.doFrame()
-//}
+function getPressedKeys() {
+    const currentlyPressed = [];
+    for (const [keyName, framesRemaining] of Object.entries(keyStates)) {
+        if (framesRemaining === 0) {
+            continue;
+        }
+        keyStates[keyName] -= 1;
+        const key = keyName;
+        currentlyPressed.push(serverboy_1.default.KEYMAP[key]);
+    }
+    if (currentlyPressed.length > 0) {
+        console.log(currentlyPressed);
+    }
+    ;
+    return currentlyPressed;
+}
+function sramToBuffer(integers) {
+    const buffer = Buffer.alloc(integers.length * 4);
+    for (let i = 0; i < integers.length; i++) {
+        buffer.writeInt32BE(integers[i], i * 4);
+    }
+    return buffer;
+}
+function saveSRAM(integers) {
+    const buffer = sramToBuffer(integers);
+    (0, fs_1.writeFileSync)(savePath, buffer);
+}
+function bufferToIntegers(buffer) {
+    const integers = [];
+    for (let i = 0; i < buffer.length; i += 4) {
+        const integer = buffer.readInt32BE(i);
+        integers.push(integer);
+    }
+    return integers;
+}
+function getSaveFile() {
+    const buffer = (0, fs_1.readFileSync)(savePath);
+    return bufferToIntegers(buffer);
+}
+function storeSaveData() {
+    var sram = gameboy.getSaveData();
+    saveSRAM(sram);
+}
+gameboy.loadRom(rom, saveData);
 const socket = new ws_1.WebSocket("ws://127.0.0.1:" + PORT.toString());
 socket.onopen = () => {
     console.log("WebSocket connection opened");
     const intervalTime = 1000 / FRAMERATE;
     const stepsPerInterval = EMULATOR_HZ / FRAMERATE;
+    var frameCount = 0;
     const frameInterval = setInterval(() => {
-        for (let i = 0; i < stepsPerInterval; i++) {
+        for (let i = 0; i < (stepsPerInterval * gameSpeed); i++) {
+            gameboy.pressKeys(getPressedKeys());
             gameboy.doFrame();
         }
-        //if (!shouldRender) { return }
         var frame = gameboy.getScreen();
         var rawBuffer = createDataBuffer(frame);
         var compressedBuffer = (0, pako_1.deflate)(rawBuffer, { raw: false });
-        gameboy.pressKeys(keyInputs);
-        keyInputs = [];
         if (socket.readyState !== ws_1.WebSocket.OPEN) {
             return;
         }
-        //console.log(socketData);
         socket.send(compressedBuffer);
-        //shouldRender = false;
     }, intervalTime);
-    socket.onmessage = (data) => {
-        var message = data.toString();
+    socket.onmessage = (event) => {
+        var message = event.data.toString();
         console.log("MESSAGE: " + message);
         var splitMessage = message.split("|");
-        if (splitMessage[0] == "input") {
-            var keyString = splitMessage[1];
-            var selectedKey = serverboy_1.default.KEYMAP[keyString];
-            console.log(keyString);
-            console.log(selectedKey);
-            keyInputs.push(selectedKey);
+        const command = splitMessage[0];
+        console.log(command);
+        const args = splitMessage.slice(1);
+        switch (command) {
+            case "input":
+                var keyString = args[0];
+                keyStates[keyString] = inputHoldTime;
+                break;
+            case "savegame":
+                console.log("saving state");
+                storeSaveData();
+                break;
+            case "setspeed":
+                const newSpeed = Math.floor(Number(args[0]));
+                console.log(`set speed to ${newSpeed}`);
+                gameSpeed = newSpeed;
+                break;
+            case "setholdtime":
+                const newHoldTime = Math.floor(Number(args[0]));
+                inputHoldTime = newHoldTime;
+                break;
         }
-        ;
     };
     socket.onclose = () => {
         clearInterval(frameInterval);

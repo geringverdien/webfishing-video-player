@@ -14,7 +14,7 @@ var inputHoldTime = 10;
 var gameSpeed = 1; // use ingame command "speed num" to speed up, must be integer
 
 const gameboy = new Gameboy();
-const romName: string = "pokemoncrystal.gbc";
+const romName: string = "doom_demo.gbc";
 const romPath: string = path.join(__dirname, "..", "roms", romName);
 const savePath: string = path.join(__dirname, "..", "saves", romName + ".sav")
 const rom = readFileSync(romPath);
