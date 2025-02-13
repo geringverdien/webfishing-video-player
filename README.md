@@ -10,4 +10,21 @@ uses serverboy on a websocket backend to send screen data to WEBFISHING which re
 5. place a rom you want to load into the "roms" folder in the root directory and change the romName in the TypeScript file to point to the rom's file name.
 6. start up the index.ts file using the `yarn start` command, it uses nodemon to live update when making changes to the index file
 7. you can now control the screen position using IJKL for sides and UO for down and up, arrow keys to rotate and bring it to you with `.`
-8. use the commands (in local chat) `u, d, l, r, a, b, start, select` to control the game. type `save` to create a save state (must be done after saving ingame!). type `abort` to stop the emulator. type `speed [number:int]` to change emulation speed. type `holdtime [number:int]` to change the button hold duration
+8. use the commands in local chat to control the emulator
+
+## controls
+all commands below except for the regular button commands can only be used by yourself:
+
+`u, d, l, r/up, down, left, right` - dpad 
+
+`a, b, start, select` - self explanatory
+
+`save` - create a save state (must be done after saving ingame!)
+
+`abort` - stops the emulator and deletes the canvases, use the trashcan button in the finapse internal ui to fully clear the script "cache"
+  
+`speed [integer]` - change emulation speed
+  
+`holdtime [integer]` - change the button hold duration, 10 is default
+
+`clear` - clears the controller and screen canvas. mainly used for debugging

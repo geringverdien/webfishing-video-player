@@ -35,7 +35,8 @@ var validCommands = [
 	"save", # saves sram to file, make sure the actual gameboy game has saved before using (e.g. start menu in pokemon)
 	"speed", # sets emulation speed to a supplied integer
 	"holdtime", # changes the amount of ticks that inputs are held down for, currently changes both dpad and other buttons
-	"abort" # stops the websocket, deletes the screen, sets processing to false. use the trashcan icon in finapse for a "full clear"
+	"abort", # stops the websocket, deletes the screen, sets processing to false. use the trashcan icon in finapse for a "full clear"
+	"clear" # clears the screen and controller canvases
 ]
 
 var lp
@@ -53,6 +54,11 @@ var screenActor
 var screenCanvasNode
 var screenTileMap
 
+var controllerActorID
+var controllerActor
+var controllerCanvasNode
+var controllerTileMap
+
 var oldMessages = Network.LOCAL_GAMECHAT_COLLECTIONS.duplicate()
 
 func _ready():
@@ -62,6 +68,8 @@ func _ready():
 	clearProps()
 	yield(get_tree().create_timer(0.25),"timeout")
 	spawnScreen(playerPos + offset, playerZone)
+	spawnController(playerPos + offset, playerZone)
+	controllerActor.global_rotation = lp.global_rotation
 	var updateTimer = Timer.new()
 	add_child(updateTimer)
 	updateTimer.wait_time = 0.1
@@ -69,11 +77,11 @@ func _ready():
 	updateTimer.start()
 	initWebsocket()
 
-func handlePacket(data):
+func handleScreenPacket(data):
 	var canvasData = []
 	for pixelData in data:
-		var posX = pixelData[0] #+ 19 # center horizontally
-		var posY = pixelData[1] #+ 27 # center vertically
+		var posX = pixelData[0] + 20 # center horizontally
+		var posY = pixelData[1] + 28 # center vertically
 		var colorTile = pixelData[2]
 		var constructedArray = [
 			Vector2(int(posX), int(posY)),
@@ -81,10 +89,38 @@ func handlePacket(data):
 		]
 		canvasData.append(constructedArray)
 		screenTileMap.set_cell(posX,posY, colorTile)
-	updateCanvas(canvasData)
+	updateCanvas(canvasData, screenActorID)
 
-func updateCanvas(canvasData):
-	Network._send_P2P_Packet({"type": "chalk_packet", "data": canvasData, "canvas_id": screenActorID}, "peers", 2, Network.CHANNELS.CHALK)
+func handleControllerPacket(data):
+	var canvasData = []
+	for pixelData in data:
+		var posX = pixelData[0]
+		var posY = pixelData[1]
+		var colorTile = pixelData[2]
+		var constructedArray = [
+			Vector2(int(posX), int(posY)),
+			colorTile
+		]
+		canvasData.append(constructedArray)
+		controllerTileMap.set_cell(posX,posY, colorTile)
+	updateCanvas(canvasData, controllerActorID)
+
+func clearDrawings():
+	var canvasData = []
+	for x in range(0, 199):
+		for y in range(0, 199):
+			var constructedArray = [
+				Vector2(x, y),
+				-1
+			]
+			canvasData.append(constructedArray)
+			controllerTileMap.set_cell(x, y, -1)
+			screenTileMap.set_cell(x, y, -1)
+	updateCanvas(canvasData, controllerActorID)
+	updateCanvas(canvasData, screenActorID)
+
+func updateCanvas(canvasData, canvasActorID):
+	Network._send_P2P_Packet({"type": "chalk_packet", "data": canvasData, "canvas_id": canvasActorID}, "peers", 2, Network.CHANNELS.CHALK)
 
 func logChat():
 	var collection = Network.LOCAL_GAMECHAT_COLLECTIONS
@@ -149,6 +185,9 @@ func handleInput(content, sender, args):
 		"abort":
 			if not sender == Network.STEAM_USERNAME: return
 			abort()
+		"clear":
+			if not sender == Network.STEAM_USERNAME: return
+			clearDrawings()
 
 
 func _input(event): # this sucks
@@ -181,7 +220,7 @@ func _input(event): # this sucks
 
 			KEY_PERIOD:
 				if not lp.busy:
-					bringScreen()
+					bringProps()
 	else:
 		match event.scancode:
 			KEY_I:
@@ -240,19 +279,37 @@ func posUpdate():
 		"rot": screenActor.global_rotation}, 
 		"peers", Network.CHANNELS.ACTOR_UPDATE)
 
-func spawnScreen(targetPos, zone):
-	screenActorID = Network._sync_create_actor("canvas", targetPos, zone, -1, Network.STEAM_ID, Vector3.ZERO)
+func createCanvas(targetPos, zone):
+	var canvasResult = {}
+	canvasResult["actorID"] = Network._sync_create_actor("canvas", targetPos, zone, -1, Network.STEAM_ID, Vector3.ZERO)
 	for node in get_tree().get_nodes_in_group("actor"):
 		if not is_instance_valid(node): continue
-		if not node.actor_id == screenActorID: continue
-		screenActor = node
-		screenCanvasNode = node.get_node("chalk_canvas")
-		screenTileMap = screenCanvasNode.get_node("Viewport/TileMap")
-		#Network.OWNED_ACTORS.append(node)
+		if not node.actor_id == canvasResult["actorID"]: continue
+		canvasResult["actor"] = node
+		canvasResult["canvasNode"] = node.get_node("chalk_canvas")
+		canvasResult["tileMap"] = canvasResult["canvasNode"].get_node("Viewport/TileMap")
+	return canvasResult
 
-func bringScreen():
+func spawnScreen(targetPos, zone):
+	var result = createCanvas(targetPos, zone)
+	screenActorID = result["actorID"]
+	screenActor = result["actor"]
+	screenCanvasNode = result["canvasNode"]
+	screenTileMap = result["tileMap"]
+
+func spawnController(targetPos, zone):
+	var result = createCanvas(targetPos, zone)
+	controllerActorID = result["actorID"]
+	controllerActor = result["actor"]
+	controllerCanvasNode = result["canvasNode"]
+	controllerTileMap = result["tileMap"]
+
+func bringProps():
 	screenActor.global_transform.origin = lp.global_transform.origin + offset
 	screenActor.global_rotation = Vector3.ZERO
+	
+	controllerActor.global_transform.origin = lp.global_transform.origin + offset
+	controllerActor.global_rotation = lp.global_rotation
 
 func clearProps():
 	for node in get_tree().get_nodes_in_group("actor"):
@@ -272,7 +329,7 @@ func initWebsocket():
 	server.connect("client_disconnected", self, "clientDisconnected")
 	server.connect("client_close_request", self, "clientRequestedClose")
 	server.connect("client_connected", self, "clientConnected")
-	server.connect("data_received", self, "onMessage")
+	server.connect("data_received", self, "onSocketMessage")
 	
 	var err = server.listen(port)
 	if err != OK:
@@ -315,18 +372,32 @@ func clientDisconnected(id, cleanExit):
 func clientRequestedClose(id, code, reason):
 	server.disconnect_peer(id, true)
 
-func onMessage(id):
-	#print("Received data from client: ", id)
+
+func packetToPixels(packet):
+	var convertedData = []
+	for i in range(0, packet.size(), 3):
+		var x = packet[i]
+		var y = packet[i + 1]
+		var color = packet[i + 2]
+		convertedData.append([x, y, color])
+	return convertedData
+
+func onSocketMessage(id):
+	print("Received data from client: ", id)
 	var packet = server.get_peer(id).get_packet()
 	var decompressedPacket = packet.decompress_dynamic(-1, File.COMPRESSION_DEFLATE)
+	var colorData = packetToPixels(decompressedPacket)
 	#print(decompressedPacket)
-	var convertedData = []
-	for i in range(0, decompressedPacket.size(), 3):
-		var x = decompressedPacket[i]
-		var y = decompressedPacket[i + 1]
-		var color = decompressedPacket[i + 2]
-		convertedData.append([x, y, color])
+
+	if clients[str(id)] == false:
+		clients[str(id)] = true
+		print("received controller image")
+		OS.clipboard = str(colorData)
+		handleControllerPacket(colorData)
+		return
+
+	
 	#print(convertedData)
 	#print(packet)
-	handlePacket(convertedData)
+	handleScreenPacket(colorData)
 	
