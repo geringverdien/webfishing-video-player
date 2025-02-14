@@ -37,7 +37,7 @@ const colorPalette: { [key: number]: number[] } = {
 }
 
 type keyStates = {
-    [key: string]: [number, boolean];
+	[key: string]: [number, boolean];
 };
 
 let keyStates: keyStates = {
@@ -258,6 +258,14 @@ socket.onopen = () => {
 			case "input":
 				const keyString: any = args[0];
 				keyStates[keyString][0] = inputHoldTime;
+				break;
+			case "keydown":
+				const keyString: any = args[0];
+				keyStates[keyString][1] = true;
+				break;
+			case "keyup":
+				const keyString: any = args[0];
+				keyStates[keyString][1] = false;
 				break;
 			case "savegame":
 				console.log("saving state");
