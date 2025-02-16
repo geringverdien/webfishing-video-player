@@ -379,17 +379,17 @@ func createDetectionArea(position: Vector3, rotOffset: Vector3, size: Vector3, k
 
 func onBodyEntered(body: Node, key: String):
 	if not "player" in body.name.to_lower(): return
-	if isJumping(body): return
+	#if isJumping(body): return
 
 	sendKeyDown(key)
-	print("%s pressed %s" % [body.name, key])
+	#print("%s pressed %s" % [body.name, key])
 
 func onBodyExited(body: Node, key: String):
 	if not "player" in body.name.to_lower(): return
 	#if isJumping(body): return
 
 	sendKeyUp(key)
-	print("%s unpressed %s" % [body.name, key])
+	#print("%s unpressed %s" % [body.name, key])
 
 
 func abort():
