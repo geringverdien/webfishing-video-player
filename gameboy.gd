@@ -73,6 +73,7 @@ var controllerActorID
 var controllerActor
 var controllerCanvasNode
 var controllerTileMap
+var controllerImageData
 
 var oldMessages = Network.LOCAL_GAMECHAT_COLLECTIONS.duplicate()
 
@@ -85,12 +86,22 @@ func _ready():
 	spawnScreen(playerPos + offset, playerZone)
 	spawnController(playerPos + offset, playerZone)
 	controllerActor.global_rotation = lp.global_rotation
-	var updateTimer = Timer.new()
-	add_child(updateTimer)
-	updateTimer.wait_time = 0.1
-	updateTimer.connect("timeout", self, "posUpdate")
-	updateTimer.start()
+	startTimers()
 	initWebsocket()
+
+func startTimers():
+	var screenUpdateTimer = Timer.new()
+	add_child(screenUpdateTimer)
+	screenUpdateTimer.wait_time = 0.1
+	screenUpdateTimer.connect("timeout", self, "posUpdate")
+
+	var controllerUpdateTimer = Timer.new()
+	add_child(controllerUpdateTimer)
+	controllerUpdateTimer.wait_time = 30
+	controllerUpdateTimer.connect("timeout", self, "controllerRefresh")
+
+	screenUpdateTimer.start()
+	controllerUpdateTimer.start()
 
 func handleScreenPacket(data):
 	var canvasData = []
@@ -311,6 +322,11 @@ func posUpdate():
 		"pos": screenActor.global_transform.origin, 
 		"rot": screenActor.global_rotation}, 
 		"peers", Network.CHANNELS.ACTOR_UPDATE)
+	
+func controllerRefresh():
+	if not controllerImageData: return
+	handleControllerPacket(controllerImageData)
+
 
 func createCanvas(targetPos, zone):
 	var canvasResult = {}
@@ -474,8 +490,8 @@ func onSocketMessage(id):
 	if clients[str(id)] == false:
 		clients[str(id)] = true
 		#print("received controller image")
-		OS.clipboard = str(colorData)
-		handleControllerPacket(colorData)
+		controllerImageData = colorData
+		handleControllerPacket(controllerImageData)
 		return
 
 	
