@@ -7,7 +7,7 @@ import { WebSocket } from "ws";
 import {deflate} from "pako"; 
 
 
-const romName: string = "pokemoncrystal.gbc";
+const romName: string = "Mario Golf.gbc";
 const PORT = 24893;
 const WIDTH = 160, HEIGHT = 144; // gameboy resolution
 const EMULATOR_HZ = 120; // emulator runs at 120 refresh rate

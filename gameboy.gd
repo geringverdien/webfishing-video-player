@@ -449,6 +449,7 @@ func sendKeyUp(key):
 
 func requestSave():
 	sendMessage("savegame|")
+	print("game saved")
 
 func setGameSpeed(gameSpeed):
 	sendMessage("setspeed|" + gameSpeed if gameSpeed != "" else "1")
