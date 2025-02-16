@@ -256,15 +256,15 @@ socket.onopen = () => {
 		const args = splitMessage.slice(1);
 		switch (command) {
 			case "input":
-				const keyString: any = args[0];
+				var keyString: any = args[0];
 				keyStates[keyString][0] = inputHoldTime;
 				break;
 			case "keydown":
-				const keyString: any = args[0];
+				var keyString: any = args[0];
 				keyStates[keyString][1] = true;
 				break;
 			case "keyup":
-				const keyString: any = args[0];
+				var keyString: any = args[0];
 				keyStates[keyString][1] = false;
 				break;
 			case "savegame":
@@ -272,12 +272,12 @@ socket.onopen = () => {
 				storeSaveData();
 				break;
 			case "setspeed":
-				const newSpeed = Math.floor(Number(args[0]));
+				var newSpeed = Math.floor(Number(args[0]));
 				console.log(`set speed to ${newSpeed}`);
 				gameSpeed = newSpeed;
 				break;
 			case "setholdtime":
-				const newHoldTime = Math.floor(Number(args[0]));
+				var newHoldTime = Math.floor(Number(args[0]));
 				inputHoldTime = newHoldTime;
 				break;
 		}

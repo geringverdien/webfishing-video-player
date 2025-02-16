@@ -1,6 +1,7 @@
 extends Node
 
 # IJKL UO to move, arrow keys to rotate, . to teleport to you
+const canvasOffset = Vector3(-9.95,0,-9.95) # makes the controller hitboxes align with the pixels on the grid
 const port = 24893
 var moveSpeed = 2 # move speed
 var fastSpeed = 4 # shift speed
@@ -8,6 +9,20 @@ var rotateSpeed = 1500 # rotation speed
 var fastRotateSpeed = 3000 # shift rotation speed
 
 var offset = Vector3(0,-1,0) # account for player height of 1
+
+var controllerHitboxes = [ # .1 units per pixel -> pos (0, -0.05 ,0) would be exactly aligned with the first pixel
+	{"pos": Vector3(7.45, 0, 6.65), "rot": Vector3(0, 0, 0), "size": Vector3(.8, .1, 1.8), "key": "UP"},
+	{"pos": Vector3(7.45, 0, 9.85), "rot": Vector3(0, 0, 0), "size": Vector3(.8, .1, 1.8), "key": "DOWN"},
+	{"pos": Vector3(5.9, 0, 8.25), "rot": Vector3(0, 90, 0), "size": Vector3(.8, .1, 1.8), "key": "LEFT"},
+	{"pos": Vector3(9.05, 0, 8.25), "rot": Vector3(0, 90, 0), "size": Vector3(.8, .1, 1.8), "key": "RIGHT"},
+
+	{"pos": Vector3(14.05, 0, 7.75), "rot": Vector3(0, 0, 0), "size": Vector3(1.4, .1, 1.4), "key": "A"},
+	{"pos": Vector3(12.15, 0, 9.35), "rot": Vector3(0, 0, 0), "size": Vector3(1.4, .1, 1.4), "key": "B"},
+
+	{"pos": Vector3(8.9, 0, 12.6), "rot": Vector3(0, 45, 0), "size": Vector3(1.9, .1, .4), "key": "SELECT"},
+	{"pos": Vector3(10.7, 0, 12.6), "rot": Vector3(0, 45, 0), "size": Vector3(1.9, .1, .4), "key": "START"},
+
+]
 
 var inputValues = {
 	"I": 0,
@@ -107,8 +122,8 @@ func handleControllerPacket(data):
 
 func clearDrawings():
 	var canvasData = []
-	for x in range(0, 199):
-		for y in range(0, 199):
+	for x in range(0, 200):
+		for y in range(0, 200):
 			var constructedArray = [
 				Vector2(x, y),
 				-1
@@ -144,7 +159,23 @@ func logChat():
 
 	if command in validCommands:
 		handleInput(command, sender, args)
+
+func castRay(from: Vector3, to: Vector3):
+	var spaceState = PlayerAPI.local_player.get_world().get_direct_space_state()
+	var result = spaceState.intersect_ray(from, to, [])
+	if not result:
+		return null
 	
+	if not result.collider:
+		return null
+		
+	return result.position.distance_to(from)
+
+func isJumping(p):
+	var rayResult = castRay(p.global_transform.origin, p.global_transform.origin - Vector3(0,100,0))
+	
+	if not rayResult: return true
+	return rayResult >= 1.02
 
 func handleInput(content, sender, args):
 	match content:
@@ -177,7 +208,7 @@ func handleInput(content, sender, args):
 			requestSave()
 		"speed":
 			if not sender == Network.STEAM_USERNAME: return
-			print("speed: " + args[0])
+			#print("set speed: " + args[0])
 			setGameSpeed(args[0])
 		"holdtime":
 			if not sender == Network.STEAM_USERNAME: return
@@ -248,6 +279,8 @@ func _input(event): # this sucks
 				rotateSpeed = oldRotateSpeed
 
 func _physics_process(delta):
+	if not is_instance_valid(screenActor): return
+
 	moveVector.x = (inputValues["J"] - inputValues["L"]) * delta * moveSpeed
 	moveVector.y = (inputValues["O"] - inputValues["U"]) * delta * moveSpeed
 	moveVector.z = (inputValues["I"] - inputValues["K"]) * delta * moveSpeed
@@ -304,7 +337,11 @@ func spawnController(targetPos, zone):
 	controllerCanvasNode = result["canvasNode"]
 	controllerTileMap = result["tileMap"]
 
+	for hitbox in controllerHitboxes:
+		createDetectionArea(hitbox["pos"], hitbox["rot"], hitbox["size"], hitbox["key"])
+
 func bringProps():
+	if not is_instance_valid(screenActor): return
 	screenActor.global_transform.origin = lp.global_transform.origin + offset
 	screenActor.global_rotation = Vector3.ZERO
 	
@@ -317,11 +354,50 @@ func clearProps():
 		Network._send_actor_action(node.actor_id, "_wipe_actor", [node.actor_id])
 		lp._wipe_actor(node.actor_id)
 
+func createDetectionArea(position: Vector3, rotOffset: Vector3, size: Vector3, keyName: String):
+	var area = Area.new()
+	area.collision_mask = 8
+	area.translation = canvasOffset + position
+	area.rotation_degrees = rotOffset
+	controllerActor.add_child(area)
+	
+	var collisionShape = CollisionShape.new()
+	var boxShape = BoxShape.new()
+	boxShape.extents = size / 2
+	collisionShape.shape = boxShape
+	area.add_child(collisionShape)
+	
+	# uncomment to see hitboxes
+	#var meshInstance = MeshInstance.new()
+	#var cube_mesh = CubeMesh.new()
+	#cube_mesh.size = size
+	#meshInstance.mesh = cube_mesh
+	#area.add_child(meshInstance)
+	
+	area.connect("body_entered", self, "onBodyEntered", [keyName])
+	area.connect("body_exited", self, "onBodyExited", [keyName])
+
+func onBodyEntered(body: Node, key: String):
+	if not "player" in body.name.to_lower(): return
+	if isJumping(body): return
+
+	sendKeyDown(key)
+	print("%s pressed %s" % [body.name, key])
+
+func onBodyExited(body: Node, key: String):
+	if not "player" in body.name.to_lower(): return
+	#if isJumping(body): return
+
+	sendKeyUp(key)
+	print("%s unpressed %s" % [body.name, key])
+
+
 func abort():
 	clearProps()
 	set_process(false)
 	server.stop()
-	print("stopped the emulator. use the trashcan icon in Finapse to fully delete all script instances.")
+	self.queue_free()
+	print("stopped the emulator and backend")
 
 func initWebsocket():
 	#print("ws init")
@@ -344,10 +420,16 @@ func sendMessage(message):
 	#print(len(clients))
 	for clientID in clients.keys():
 		server.get_peer(int(clientID)).put_packet(message.to_utf8())
-		print("sent " + message + " to " + str(clientID))
+		#print("sent " + message + " to " + str(clientID))
 
 func sendInput(inputstr):
 	sendMessage("input|" + inputstr)
+
+func sendKeyDown(key):
+	sendMessage("keydown|" + key)
+
+func sendKeyUp(key):
+	sendMessage("keyup|" + key)
 
 func requestSave():
 	sendMessage("savegame|")
@@ -383,7 +465,7 @@ func packetToPixels(packet):
 	return convertedData
 
 func onSocketMessage(id):
-	print("Received data from client: ", id)
+	#print("Received data from client: " + str(id))
 	var packet = server.get_peer(id).get_packet()
 	var decompressedPacket = packet.decompress_dynamic(-1, File.COMPRESSION_DEFLATE)
 	var colorData = packetToPixels(decompressedPacket)
@@ -391,7 +473,7 @@ func onSocketMessage(id):
 
 	if clients[str(id)] == false:
 		clients[str(id)] = true
-		print("received controller image")
+		#print("received controller image")
 		OS.clipboard = str(colorData)
 		handleControllerPacket(colorData)
 		return
