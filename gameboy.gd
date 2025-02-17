@@ -1,8 +1,11 @@
+# TODO: custom screen locations loaded off a json file
+# TODO: change onMessage to handle multiple types of packets and add audio packets for sound
+
 extends Node
 
 # IJKL UO to move, arrow keys to rotate, . to teleport to you
 const canvasOffset = Vector3(-9.95,0,-9.95) # makes the controller hitboxes align with the pixels on the grid
-const port = 24893
+const port = 24897
 var moveSpeed = 2 # move speed
 var fastSpeed = 4 # shift speed
 var rotateSpeed = 1500 # rotation speed
@@ -51,7 +54,9 @@ var validCommands = [
 	"speed", # sets emulation speed to a supplied integer
 	"holdtime", # changes the amount of ticks that inputs are held down for, currently changes both dpad and other buttons
 	"abort", # stops the websocket, deletes the screen, sets processing to false. use the trashcan icon in finapse for a "full clear"
-	"clear" # clears the screen and controller canvases
+	"clear", # clears the screen and controller canvases
+	"chalksmod", # chalksmod true/false, enables or disables usage of Chalks colors
+	"colorthreshold" # colorthreshold 1000, sets the threshold for closest color distance
 ]
 
 var lp
@@ -230,6 +235,13 @@ func handleInput(content, sender, args):
 		"clear":
 			if not sender == Network.STEAM_USERNAME: return
 			clearDrawings()
+		"chalksmod":
+			if not sender == Network.STEAM_USERNAME: return
+			setChalkMode(args[0])
+			print("enabled Chalks colors" if (args[0] == "true" or args[0] == "on") else "disabled Chalks colors")
+		"colorthreshold":
+			if not sender == Network.STEAM_USERNAME: return
+			setColorThreshold(args[0])
 
 
 func _input(event): # this sucks
@@ -427,6 +439,8 @@ func initWebsocket():
 	if err != OK:
 		print("unable to start server")
 		set_process(false)
+		clearProps()
+		queue_free()
 		return
 	print("websocket started on port " + str(port))
 	set_process(true)
@@ -456,6 +470,13 @@ func setGameSpeed(gameSpeed):
 
 func setHoldTime(holdTime):
 	sendMessage("setholdtime|" + holdTime if holdTime != "" else "10")
+
+func setChalkMode(useModded):
+	var chalkString = "true" if (useModded == "true" or useModded == "on") else "false"
+	sendMessage("setchalkmode|" + chalkString)
+
+func setColorThreshold(colorThreshold):
+	sendMessage("setcolorthreshold|" + colorThreshold if colorThreshold != "" else "4000")
 
 
 

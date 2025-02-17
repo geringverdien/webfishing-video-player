@@ -6,14 +6,21 @@ import { PNG } from "pngjs";
 import { WebSocket } from "ws";
 import {deflate} from "pako"; 
 
+// TODO: modify serverboy to expose separate channel audio frequencies and send data to client
 
-const romName: string = "Mario Golf.gbc";
-const PORT = 24893;
+
+const romName: string = "pokemoncrystal.gbc";
+
+
+const PORT = 24897;
 const WIDTH = 160, HEIGHT = 144; // gameboy resolution
 const EMULATOR_HZ = 120; // emulator runs at 120 refresh rate
 const FRAMERATE = 30; // gameboy runs at ~60 fps
 let inputHoldTime = 10;
 let gameSpeed = 1; // use ingame command "speed num" to speed up, must be integer
+const useChalksColorPalette = false // toggled ingame using "chalksmod true/false/on/off", causes the fps to drop drastically
+let colorDistanceThreshold = 4000; // use ingame command "colorthreshold num" to change, helps with low fps when using Chalks colors while sacrificing color accuracy
+
 
 const gameboy = new Gameboy();
 const romPath: string = path.join(__dirname, "..", "roms", romName);
@@ -27,7 +34,7 @@ if (existsSync(savePath)) {
 	saveData = getSaveFile();
 }
 
-const colorPalette: { [key: number]: number[] } = {
+const vanillaColorPalette: { [key: number]: number[] } = {
 	0: [255, 238, 218], // white
 	1: [5, 11, 21], // black
 	2: [172, 0, 41], // red
@@ -35,6 +42,72 @@ const colorPalette: { [key: number]: number[] } = {
 	4: [230, 157, 0], // yellow
 	6: [125, 162, 36], // green
 }
+
+const chalksModColorPalette: { [key: number]: [number, number, number] } = {
+	0: [255, 238, 218], // white
+	1: [5, 11, 21], // black
+	2: [172, 0, 41], // red
+	3: [0, 133, 131], // blue
+	4: [230, 157, 0], // yellow
+	6: [125, 162, 36], // green
+    7: [163, 178, 210],
+    8: [214, 206, 194],
+    9: [191, 222, 216],
+    10: [169, 196, 132],
+    11: [93, 147, 123],
+    12: [162, 166, 169],
+    13: [119, 127, 143],
+    14: [234, 178, 129],
+    15: [234, 114, 134],
+    16: [244, 164, 191],
+    17: [160, 124, 167],
+    18: [191, 121, 109],
+    19: [245, 209, 182],
+    20: [227, 225, 159],
+    21: [255, 223, 0],
+    22: [255, 191, 0],
+    23: [196, 180, 84],
+    24: [245, 222, 179],
+    25: [244, 196, 48],
+    26: [0, 255, 255],
+    27: [137, 207, 240],
+    28: [77, 77, 255],
+    29: [0, 0, 139],
+    30: [65, 105, 225],
+    31: [0, 103, 66],
+    32: [76, 187, 23],
+    33: [46, 111, 64],
+    34: [46, 139, 87],
+    35: [192, 192, 192],
+    36: [129, 133, 137],
+    37: [137, 148, 153],
+    38: [112, 128, 144],
+    39: [255, 165, 0],
+    40: [255, 140, 0],
+    41: [215, 148, 45],
+    42: [255, 95, 31],
+    43: [204, 119, 34],
+    44: [255, 105, 180],
+    45: [255, 16, 240],
+    46: [170, 51, 106],
+    47: [244, 180, 196],
+    48: [149, 53, 83],
+    49: [216, 191, 216],
+    50: [127, 0, 255],
+    51: [128, 0, 128],
+    52: [255, 36, 0],
+    53: [255, 68, 51],
+    54: [165, 42, 42],
+    55: [145, 56, 49],
+    56: [255, 0, 0],
+    57: [59, 34, 25],
+    58: [161, 110, 75],
+    59: [212, 170, 120],
+    60: [230, 188, 152],
+    61: [255, 231, 209]
+};
+
+var usedColorPalette = useChalksColorPalette ? chalksModColorPalette : vanillaColorPalette;
 
 type keyStates = {
 	[key: string]: [number, boolean];
@@ -99,11 +172,15 @@ function findClosestColor(target: number[]): number {
 	let minDistance = Infinity;
 	let closestKey = 0;
 
-	for (const [key, color] of Object.entries(colorPalette)) {
+	for (const [key, color] of Object.entries(usedColorPalette)) {
 	  	const dr = target[0] - color[0];
 	  	const dg = target[1] - color[1];
 	  	const db = target[2] - color[2];
 	  	const distanceSq = dr * dr + dg * dg + db * db;
+
+		if (distanceSq < colorDistanceThreshold) {
+			return Number(key);
+		}
 
 	  	if (distanceSq < minDistance) {
 			minDistance = distanceSq;
@@ -279,6 +356,14 @@ socket.onopen = () => {
 			case "setholdtime":
 				var newHoldTime = Math.floor(Number(args[0]));
 				inputHoldTime = newHoldTime;
+				break;
+			case "setchalkmode":
+				var useModdedChalk = args[0] === "true";
+				usedColorPalette = useModdedChalk ? chalksModColorPalette : vanillaColorPalette;
+				break;
+			case "setcolorthreshold":
+				var newThreshold = Math.floor(Number(args[0]));
+				colorDistanceThreshold = newThreshold;
 				break;
 		}
 	}
