@@ -3,14 +3,14 @@ uses serverboy on a websocket backend to send screen data to WEBFISHING which re
 
 # how to use
 0. clone the repository and open it in an ide, i use Visual Studio Code
-1. download my mod FinapseX to run the gameboy.gd script, i recommend also getting the vscode extension for easier use (check the thunderstore page)
+1. download my mod [FinapseX](https://thunderstore.io/c/webfishing/p/TeamFishnet/FinapseX/) to run the gameboy.gd script, i recommend also getting the [vscode extension](https://github.com/geringverdien/TeamFishnet/raw/refs/heads/main/Finapse%20X/Finapse%20Xecutor/finapse-xecute/finapse-xecute-0.0.1.vsix) for easier use
 2. join a lobby
 3. run the gameboy.gd script using finapse
 4. make sure you installed all the packages needed for the emulator backend using `yarn install`
 5. place a rom you want to load into the "roms" folder in the root directory and change the romName in the TypeScript file to point to the rom's file name.
-6. start up the index.ts file using the `yarn start` command, it uses nodemon to live update when making changes to the index file
-7. you can now control the screen position using IJKL for sides and UO for down and up, arrow keys to rotate and bring it to you with `.`
-8. use the commands in local chat to control the emulator
+6. start up the index.ts file using the `yarn start` command, it uses nodemon to live update when making changes to the index file which lets you quickly reload the emulator
+7. you can now control the screen position using IJKL for sides and UO for down and up, arrow keys to rotate and bring it (as well as the controller) to you with `.`
+8. use the commands in local chat or the controller on the floor to control the emulator
 
 ## controls
 all commands below except for the regular button commands can only be used by yourself:
@@ -21,10 +21,14 @@ all commands below except for the regular button commands can only be used by yo
 
 `save` - create a save state (must be done after saving ingame!)
 
-`abort` - stops the emulator and deletes the canvases, use the trashcan button in the finapse internal ui to fully clear the script "cache"
+`abort` - stops the emulator, deletes the canvases and deletes the GDScript
   
 `speed [integer]` - change emulation speed
   
 `holdtime [integer]` - change the button hold duration, 10 is default
 
 `clear` - clears the controller and screen canvas. mainly used for debugging
+
+`chalksmod [true/false/on/off]` - toggles the [Chalks mod](https://thunderstore.io/c/webfishing/p/hostileonion/chalks/) extended color palette
+
+`colorthreshold [integer]` - changes the accepted distance between colors to be accepted, 4000 is default 

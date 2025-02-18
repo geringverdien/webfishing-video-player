@@ -224,11 +224,11 @@ func handleInput(content, sender, args):
 			requestSave()
 		"speed":
 			if not sender == Network.STEAM_USERNAME: return
-			#print("set speed: " + args[0])
+			#print("set speed to " + args[0])
 			setGameSpeed(args[0])
 		"holdtime":
 			if not sender == Network.STEAM_USERNAME: return
-			setHoldTime(args[0])	
+			setHoldTime(args[0])
 		"abort":
 			if not sender == Network.STEAM_USERNAME: return
 			abort()
