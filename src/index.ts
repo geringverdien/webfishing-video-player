@@ -6,12 +6,11 @@ import * as path from "path";
 import { PNG } from "pngjs";
 import { WebSocket } from "ws";
 import {deflate} from "pako"; 
-import { channel } from 'diagnostics_channel';
 
 // TODO: modify serverboy to expose separate channel audio frequencies and send data to client
 
 
-const romName: string = "tetris.gbc";
+const romName: string = "wario land.gbc";
 
 
 const PORT = 24897;
@@ -22,7 +21,7 @@ let inputHoldTime = 10;
 let gameSpeed = 1; // use ingame command "speed num" to speed up, must be integer
 const useChalksColorPalette = false // toggled ingame using "chalksmod true/false/on/off", causes the fps to drop drastically
 let colorDistanceThreshold = 4000; // use ingame command "colorthreshold num" to change, helps with low fps when using Chalks colors while sacrificing color accuracy
-let audioOutput = true; // use ingame command "audio true/false/on/off" to toggle audio output	
+let audioOutput = false; // use ingame command "audio true/false/on/off" to toggle audio output	
 
 const gameboy = new Gameboy();
 const romPath: string = path.join(__dirname, "..", "roms", romName);
