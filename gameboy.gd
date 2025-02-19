@@ -28,9 +28,9 @@ var controllerHitboxes = [ # .1 units per pixel -> pos (0, -0.05 ,0) would be ex
 ]
 
 var octaveOffsets = [ # half octaves
-	-2,
-	-2,
-	-3
+	-3,
+	-3,
+	-4
 ]
 
 
@@ -50,7 +50,9 @@ var validCommands = [
 	"abort", # stops the websocket, deletes the screen, sets processing to false. use the trashcan icon in finapse for a "full clear"
 	"clear", # clears the screen and controller canvases
 	"chalksmod", # chalksmod true/false, enables or disables usage of Chalks colors
-	"colorthreshold" # colorthreshold 1000, sets the threshold for closest color distance
+	"colorthreshold", # colorthreshold 1000, sets the threshold for closest color distance
+	"octave", # octave [channel] 2, shifts by half octave
+	"audio", # audio true/false, enables or disables audio
 ]
 
 var inputValues = {
@@ -99,10 +101,8 @@ var oldAudioChannelData = { # amplitude, frequency
 	3: [0, 0]
 }
 
-
-
-
 var oldMessages = Network.LOCAL_GAMECHAT_COLLECTIONS.duplicate()
+
 
 func _ready():
 	lp = PlayerAPI.local_player
@@ -216,6 +216,7 @@ func isJumping(p):
 	return rayResult >= 1.02
 
 func handleInput(content, sender, args):
+	var isSelf = sender == Network.STEAM_USERNAME
 	match content:
 		"u":
 			sendInput("UP")
@@ -242,28 +243,38 @@ func handleInput(content, sender, args):
 		"start":
 			sendInput("START")
 		"save":
-			if not sender == Network.STEAM_USERNAME: return
+			if not isSelf: return
 			requestSave()
 		"speed":
-			if not sender == Network.STEAM_USERNAME: return
+			if not isSelf: return
 			#print("set speed to " + args[0])
 			setGameSpeed(args[0])
 		"holdtime":
-			if not sender == Network.STEAM_USERNAME: return
+			if not isSelf: return
 			setHoldTime(args[0])
 		"abort":
-			if not sender == Network.STEAM_USERNAME: return
+			if not isSelf: return
 			abort()
 		"clear":
-			if not sender == Network.STEAM_USERNAME: return
+			if not isSelf: return
 			clearDrawings()
 		"chalksmod":
-			if not sender == Network.STEAM_USERNAME: return
+			if not isSelf: return
 			setChalkMode(args[0])
 			print("enabled Chalks colors" if (args[0] == "true" or args[0] == "on") else "disabled Chalks colors")
 		"colorthreshold":
-			if not sender == Network.STEAM_USERNAME: return
+			if not isSelf: return
 			setColorThreshold(args[0])
+		"octave":
+			if not isSelf: return
+			var channelNum = int(args[0])
+			var shiftAmount = int(args[1])
+			octaveOffsets[channelNum - 1] = shiftAmount
+			print("set channel " + str(channelNum) + " to " + str(shiftAmount) + " octaves")
+		"audio":
+			if not isSelf: return
+			setAudioToggle(args[0])
+			print("enabled audio" if (args[0] == "true" or args[0] == "on") else "disabled audio")
 
 
 func _input(event): # this sucks
@@ -496,6 +507,10 @@ func setHoldTime(holdTime):
 func setChalkMode(useModded):
 	var chalkString = "true" if (useModded == "true" or useModded == "on") else "false"
 	sendMessage("setchalkmode|" + chalkString)
+
+func setAudioToggle(audioEnabled):
+	var audioString = "true" if (audioEnabled == "true" or audioEnabled == "on") else "false"
+	sendMessage("setaudio|" + audioString)
 
 func setColorThreshold(colorThreshold):
 	sendMessage("setcolorthreshold|" + colorThreshold if colorThreshold != "" else "4000")
