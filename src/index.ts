@@ -1,10 +1,12 @@
-import Gameboy from "serverboy";
+import Gameboy from '../serverboy/src/interface'; // Import the default export
+import { KEYMAP } from '../serverboy/src/interface'; // Import named exports if needed
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import "ws";
 import * as path from "path";
 import { PNG } from "pngjs";
 import { WebSocket } from "ws";
 import {deflate} from "pako"; 
+import { channel } from 'diagnostics_channel';
 
 // TODO: modify serverboy to expose separate channel audio frequencies and send data to client
 
@@ -28,7 +30,7 @@ const savePath: string = path.join(__dirname, "..", "saves", romName + ".sav")
 const controllerPath: string = path.join(__dirname, "..", "controller.png")
 const rom = readFileSync(romPath);
 const controllerImage = readFileSync(controllerPath)
-let saveData = null
+let saveData: number[] | undefined = undefined;
 
 if (existsSync(savePath)) {
 	saveData = getSaveFile();
@@ -154,7 +156,43 @@ function createDataBuffer(pixelArray: number[]): ArrayBuffer {
 		changedPixels.push([x, y, colorPaletteIndex]);
 	}
 
-	const buffer = new ArrayBuffer(changedPixels.length * 3);
+	const buffer = new ArrayBuffer(changedPixels.length * 3 + 1);
+	const view = new Uint8Array(buffer);
+	
+	for (let i = 0; i < changedPixels.length; i++) {
+		const pixel = changedPixels[i];
+		view[i * 3] = pixel[0];     // x
+		view[i * 3 + 1] = pixel[1]; // y
+		view[i * 3 + 2] = pixel[2]; // color
+	}
+	
+	view[view.length - 1] = 0;
+	
+	return buffer;
+}
+
+function createControllerPixelBuffer(pixelArray: number[]): ArrayBuffer {
+	const changedPixels: Array<any> = [];
+
+	for (let i = 0; i < pixelArray.length; i += 4) {
+		const pixelIndex = i / 4;
+		const x = pixelIndex % 200;
+		const y = Math.floor(pixelIndex / 200);
+
+		//if (y >= HEIGHT) continue;
+
+		const r = pixelArray[i];
+		const g = pixelArray[i + 1];
+		const b = pixelArray[i + 2];
+		const a = pixelArray[i + 3];
+		if (a === 0) { 
+			continue 
+		};
+		const colorPaletteIndex = findClosestColor([r, g, b]);
+		changedPixels.push([x, y, colorPaletteIndex]);
+	}
+
+	const buffer = new ArrayBuffer(changedPixels.length * 3 + 1);
 	const view = new Uint8Array(buffer);
 
 	for (let i = 0; i < changedPixels.length; i++) {
@@ -164,9 +202,42 @@ function createDataBuffer(pixelArray: number[]): ArrayBuffer {
 		view[i * 3 + 2] = pixel[2]; // color
 	}
 
+	view[view.length - 1] = 0;
+
 	return buffer;
 }
 
+function createControllerBuffer(): ArrayBuffer {
+	const imageDataBuffer = PNG.sync.read(controllerImage).data;
+	const imageDataArray = Buffer.from(imageDataBuffer).toJSON().data;
+	const buffer = createControllerPixelBuffer(imageDataArray);
+	console.log(buffer.byteLength)
+	const compressedControllerBuffer = deflate(buffer, { raw: false });
+	return compressedControllerBuffer;
+}
+
+function frequencyToMidiNote(frequency: number): number {
+	const noteNumber = 12 * Math.log2(frequency / 440) + 69;
+	return Math.round(noteNumber);
+	
+  }
+
+function createAudioDataBuffer(audioData: number[][]): ArrayBuffer {
+	const audioBuffer = new ArrayBuffer(audioData.length*2 + 1);
+	const view = new Uint8Array(audioBuffer);
+	for (let i = 0; i < audioData.length; i++) {
+		const channelData = audioData[i];
+		const isPlayingFlag = channelData[0]
+		const frequency = channelData[1]
+		const notePitch = frequency > 0 ? frequencyToMidiNote(frequency) : 0;
+		view[i * 2] = isPlayingFlag;
+		view[i * 2 + 1] = notePitch; // note pitch
+	}
+
+	view[view.length - 1] = 1;
+	const compressedControllerBuffer = deflate(audioBuffer, { raw: false });
+	return compressedControllerBuffer;
+}
 
 function findClosestColor(target: number[]): number {
 	let minDistance = Infinity;
@@ -206,11 +277,11 @@ function getPressedKeys(): number[] {
 			keyStates[keyName][0] -= 1;
 		}
 		
-		const key = keyName as keyof typeof Gameboy.KEYMAP;
+		const key = keyName as keyof typeof KEYMAP;
 
-		currentlyPressed.push(Gameboy.KEYMAP[key]);
+		currentlyPressed.push(KEYMAP[key]);
 	}
-	if (currentlyPressed.length > 0) {console.log(currentlyPressed) };
+	//if (currentlyPressed.length > 0) {console.log(currentlyPressed) };
 	return currentlyPressed;
 }
 
@@ -250,48 +321,6 @@ function storeSaveData() {
 	saveSRAM(sram)
 }
 
-function createControllerPixelBuffer(pixelArray: number[]): ArrayBuffer {
-	const changedPixels: Array<any> = [];
-
-	for (let i = 0; i < pixelArray.length; i += 4) {
-		const pixelIndex = i / 4;
-		const x = pixelIndex % 200;
-		const y = Math.floor(pixelIndex / 200);
-
-		//if (y >= HEIGHT) continue;
-
-		const r = pixelArray[i];
-		const g = pixelArray[i + 1];
-		const b = pixelArray[i + 2];
-		const a = pixelArray[i + 3];
-		if (a === 0) { 
-			continue 
-		};
-		const colorPaletteIndex = findClosestColor([r, g, b]);
-		changedPixels.push([x, y, colorPaletteIndex]);
-	}
-
-	const buffer = new ArrayBuffer(changedPixels.length * 3);
-	const view = new Uint8Array(buffer);
-
-	for (let i = 0; i < changedPixels.length; i++) {
-		const pixel = changedPixels[i];
-		view[i * 3] = pixel[0];     // x
-		view[i * 3 + 1] = pixel[1]; // y
-		view[i * 3 + 2] = pixel[2]; // color
-	}
-
-	return buffer;
-}
-
-function createControllerBuffer(): ArrayBuffer {
-	const imageDataBuffer = PNG.sync.read(controllerImage).data;
-	const imageDataArray = Buffer.from(imageDataBuffer).toJSON().data;
-	const buffer = createControllerPixelBuffer(imageDataArray);
-	console.log(buffer.byteLength)
-	const compressedControllerBuffer = deflate(buffer, { raw: false });
-	return compressedControllerBuffer;
-}
 
 const socket = new WebSocket("ws://127.0.0.1:" + PORT.toString());
 
@@ -323,6 +352,15 @@ socket.onopen = () => {
 		socket.send(compressedBuffer);
   
 	}, intervalTime);
+
+	const audioInterval = setInterval(() => {
+		const audioData = gameboy.getAudio();
+		//console.log(audioData)
+		const buffer = createAudioDataBuffer(audioData)
+
+		if (socket.readyState !== WebSocket.OPEN) { return }
+		socket.send(buffer);
+	}, intervalTime)
 
 	socket.onmessage = (event) => {
 		let message: string = event.data.toString();

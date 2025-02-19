@@ -3,15 +3,16 @@
   "packageManager": "yarn@4.5.2",
   "dependencies": {
     "fs": "^0.0.1-security",
+    "midi": "^2.0.0",
     "pako": "^2.1.0",
     "path": "^0.12.7",
     "pngjs": "^7.0.0",
-    "serverboy": "^0.0.7",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3",
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@types/midi": "^2",
     "@types/node": "^22.13.1",
     "@types/pako": "^2",
     "@types/pngjs": "^6.0.5",

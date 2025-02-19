@@ -27,18 +27,12 @@ var controllerHitboxes = [ # .1 units per pixel -> pos (0, -0.05 ,0) would be ex
 
 ]
 
-var inputValues = {
-	"I": 0,
-	"K": 0,
-	"J": 0,
-	"L": 0,
-	"U": 0,
-	"O": 0,
-	"up": 0,
-	"down": 0,
-	"left": 0,
-	"right": 0,
-}
+var octaveOffsets = [ # half octaves
+	-2,
+	-2,
+	-3
+]
+
 
 # commands for inputs, saving current SRAM to file, emulation speed, button hold time, fully removing the emulator
 var validCommands = [
@@ -58,6 +52,19 @@ var validCommands = [
 	"chalksmod", # chalksmod true/false, enables or disables usage of Chalks colors
 	"colorthreshold" # colorthreshold 1000, sets the threshold for closest color distance
 ]
+
+var inputValues = {
+	"I": 0,
+	"K": 0,
+	"J": 0,
+	"L": 0,
+	"U": 0,
+	"O": 0,
+	"up": 0,
+	"down": 0,
+	"left": 0,
+	"right": 0,
+}
 
 var lp
 
@@ -79,6 +86,21 @@ var controllerActor
 var controllerCanvasNode
 var controllerTileMap
 var controllerImageData
+
+
+var openStringPitches := [40, 45, 50, 55, 59, 64]
+var highestFret := 16
+
+var lastStrum: Array = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
+var stringQueue: Array = [0, 1, 2, 3, 4, 5]
+var oldAudioChannelData = { # amplitude, frequency
+	1: [0, 0],
+	2: [0, 0],
+	3: [0, 0]
+}
+
+
+
 
 var oldMessages = Network.LOCAL_GAMECHAT_COLLECTIONS.duplicate()
 
@@ -493,6 +515,86 @@ func clientRequestedClose(id, code, reason):
 	server.disconnect_peer(id, true)
 
 
+
+func isPitchInBounds(pitch: int) -> bool:
+	return pitch >= openStringPitches[0] and pitch <= openStringPitches[5] + highestFret
+
+func getPossibleNotes(pitch: int) -> Array:
+	var possible_notes := []
+
+	var string: int = 0
+	for stringPitch in openStringPitches:
+		if pitch >= stringPitch and pitch <= stringPitch + highestFret:
+			var fret: int = pitch - stringPitch
+			possible_notes.append([string, fret])
+		string += 1
+
+	return possible_notes
+
+func getBestNote(notes: Array) -> Array:
+	var bestNode: Array
+	# starts at the top of the queue
+	var leastRecentStringIndex := stringQueue.size() - 1
+
+	for note in notes:
+		var string_index = stringQueue.find(note[0])
+
+		if string_index <= leastRecentStringIndex:
+			bestNode = note
+			leastRecentStringIndex = string_index
+
+	return bestNode
+
+func playNote(note: Array) -> void:
+	var string: int = note[0]
+	var fret: int = note[1]
+
+	var delta: int = OS.get_system_time_msecs() - lastStrum[string][0]
+
+	if delta < 500 and lastStrum[string][1] != fret:
+		PlayerData.emit_signal("_hammer_guitar", string, fret)
+	else:
+		PlayerData.emit_signal("_play_guitar", string, fret, 1.0)
+		lastStrum[string] = [OS.get_system_time_msecs(), fret]
+
+	updateStringQueue(string)
+
+func updateStringQueue(last_played_string: int) -> void:
+	var lastStringIndex := stringQueue.find(last_played_string)
+
+	if lastStringIndex != -1:
+		stringQueue.pop_at(lastStringIndex)
+
+	stringQueue.append(last_played_string)
+
+
+func processAudioPacket(packet):
+	#print(packet)
+	var channelData = { # amplitude, frequency
+		1: [packet[0], packet[1] + octaveOffsets[0] * 6], # channel 1
+		2: [packet[2], packet[3] + octaveOffsets[1] * 6], # channel 2
+		3: [packet[4], packet[5] + octaveOffsets[2] * 6] # channel 3
+	}
+
+	for channel in channelData.keys():
+		var channelEnabled = channelData[channel][0]
+		#print(channelEnabled)
+		if not channelEnabled: continue
+		var notePitch = channelData[channel][1]
+		if notePitch == 0: continue
+		
+		if oldAudioChannelData[channel] == channelData[channel]: continue
+		oldAudioChannelData[channel] = channelData[channel]
+		#print(notePitch)
+		if !isPitchInBounds(notePitch): 
+			continue
+
+		var possible_notes := getPossibleNotes(notePitch)
+		var note := getBestNote(possible_notes)
+		print(str(notePitch) + ": " + str(note))
+		playNote(note)
+
+
 func packetToPixels(packet):
 	var convertedData = []
 	for i in range(0, packet.size(), 3):
@@ -506,18 +608,18 @@ func onSocketMessage(id):
 	#print("Received data from client: " + str(id))
 	var packet = server.get_peer(id).get_packet()
 	var decompressedPacket = packet.decompress_dynamic(-1, File.COMPRESSION_DEFLATE)
-	var colorData = packetToPixels(decompressedPacket)
+	var isPixelPacket = decompressedPacket[-1] == 0
+	decompressedPacket.remove(len(decompressedPacket) - 1)
 	#print(decompressedPacket)
+	if isPixelPacket:
+		var colorData = packetToPixels(decompressedPacket)
+		if clients[str(id)] == false and isPixelPacket:
+			clients[str(id)] = true
+			#print("received controller image")
+			controllerImageData = colorData
+			handleControllerPacket(controllerImageData)
+			return
 
-	if clients[str(id)] == false:
-		clients[str(id)] = true
-		#print("received controller image")
-		controllerImageData = colorData
-		handleControllerPacket(controllerImageData)
-		return
-
-	
-	#print(convertedData)
-	#print(packet)
-	handleScreenPacket(colorData)
-	
+		handleScreenPacket(colorData)
+	else:
+		processAudioPacket(decompressedPacket)
