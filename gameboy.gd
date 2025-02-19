@@ -606,7 +606,7 @@ func processAudioPacket(packet):
 
 		var possible_notes := getPossibleNotes(notePitch)
 		var note := getBestNote(possible_notes)
-		print(str(notePitch) + ": " + str(note))
+		#print(str(notePitch) + ": " + str(note))
 		playNote(note)
 
 

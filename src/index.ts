@@ -10,7 +10,7 @@ import {deflate} from "pako";
 // TODO: modify serverboy to expose separate channel audio frequencies and send data to client
 
 
-const romName: string = "wario land.gbc";
+const romName: string = "Mario Tennis.gbc";
 
 
 const PORT = 24897;
