@@ -1,5 +1,4 @@
-# TODO: custom screen locations loaded off a json file
-# TODO: change onMessage to handle multiple types of packets and add audio packets for sound
+# TODO: replace guitar audio system with sfx system for hopefully better sound results
 
 extends Node
 
@@ -33,8 +32,7 @@ var octaveOffsets = [ # half octaves
 	-4
 ]
 
-
-# commands for inputs, saving current SRAM to file, emulation speed, button hold time, fully removing the emulator
+# all commands must be sent in local chat to be used
 var validCommands = [
 	"u", "up", # up
 	"d", "down", # down
@@ -53,6 +51,10 @@ var validCommands = [
 	"colorthreshold", # colorthreshold 1000, sets the threshold for closest color distance
 	"octave", # octave [channel] 2, shifts by half octave
 	"audio", # audio true/false, enables or disables audio
+	"getpresets", # prints list of saved presets
+	"savepreset", # savepreset [name], saves the current screen and controller locations
+	"loadpreset", # loadpreset [name], loads the screen and controller locations
+	"deletepreset", # deletepreset [name], deletes the saved preset
 ]
 
 var inputValues = {
@@ -117,17 +119,18 @@ func _ready():
 	initWebsocket()
 
 func startTimers():
-	var screenUpdateTimer = Timer.new()
-	add_child(screenUpdateTimer)
-	screenUpdateTimer.wait_time = 0.1
-	screenUpdateTimer.connect("timeout", self, "posUpdate")
+	# turns out i dont even need to manually send the position update packets lol
+	# var screenUpdateTimer = Timer.new()
+	# add_child(screenUpdateTimer)
+	# screenUpdateTimer.wait_time = 0.1
+	# screenUpdateTimer.connect("timeout", self, "posUpdate")
 
 	var controllerUpdateTimer = Timer.new()
 	add_child(controllerUpdateTimer)
 	controllerUpdateTimer.wait_time = 30
 	controllerUpdateTimer.connect("timeout", self, "controllerRefresh")
 
-	screenUpdateTimer.start()
+	# screenUpdateTimer.start()
 	controllerUpdateTimer.start()
 
 func handleScreenPacket(data):
@@ -275,6 +278,97 @@ func handleInput(content, sender, args):
 			if not isSelf: return
 			setAudioToggle(args[0])
 			print("enabled audio" if (args[0] == "true" or args[0] == "on") else "disabled audio")
+		"getpresets":
+			if not isSelf: return
+			var presets = getCanvasPresetNames()
+			if len(presets) == 0: 
+				print("no presets saved")
+				return
+			print("current presets: " + str(getCanvasPresetNames()))
+		"savepreset":
+			if not isSelf: return
+			var presetName = args[0].to_lower()
+			saveCanvasPreset(presetName, screenActor.global_transform.origin, screenActor.global_rotation, controllerActor.global_transform.origin, controllerActor.global_rotation)
+			print("saved preset " + args[0])
+		"loadpreset":
+			if not isSelf: return
+			var presetName = args[0].to_lower()
+			var presetExists = loadCanvasPreset(presetName)
+			if not presetExists: 
+				print("preset " + presetName + " does not exist")
+				return
+			print("loaded preset " + presetName)
+		"deletepreset":
+			if not isSelf: return
+			var presetName = args[0].to_lower()
+			var presets = readCanvasPresets()
+			if not presetName in presets.keys():
+				print("preset " + presetName + " does not exist")
+				return
+			presets.erase(presetName)
+			writeCanvasPresets(presets)
+			print("deleted preset " + presetName)
+
+func getCanvasPresetNames():
+	var presets = readCanvasPresets()
+	var presetNames = []
+	for preset in presets.keys():
+		presetNames.append(preset)
+	return presetNames
+
+func loadCanvasPreset(presetName: String):
+	var presets = readCanvasPresets()
+	if not presetName in presets.keys(): return false
+	var preset = presets[presetName]
+	screenActor.global_transform.origin = Vector3(preset["screenPos"][0], preset["screenPos"][1], preset["screenPos"][2])
+	screenActor.global_rotation = Vector3(preset["screenRot"][0], preset["screenRot"][1], preset["screenRot"][2])
+	controllerActor.global_transform.origin = Vector3(preset["controllerPos"][0], preset["controllerPos"][1], preset["controllerPos"][2])
+	controllerActor.global_rotation = Vector3(preset["controllerRot"][0], preset["controllerRot"][1], preset["controllerRot"][2])
+	return true
+
+func deleteCanvasPreset(presetName: String):
+	var presets = readCanvasPresets()
+	if not presetName in presets.keys(): return false
+	presets.erase(presetName)
+	writeCanvasPresets(presets)
+	return true
+
+func saveCanvasPreset(presetName: String, screenPos: Vector3, screenRot: Vector3, controllerPos: Vector3, controllerRot: Vector3):
+	var currentPresets = readCanvasPresets()
+	currentPresets[presetName] = {
+		"screenPos": [screenPos.x, screenPos.y, screenPos.z],
+		"screenRot": [screenRot.x, screenRot.y, screenRot.z],
+		"controllerPos": [controllerPos.x, controllerPos.y, controllerPos.z], 
+		"controllerRot": [controllerRot.x, controllerRot.y, controllerRot.z],
+	}
+	
+	writeCanvasPresets(currentPresets)
+
+func writeCanvasPresets(canvasPresetData):
+	var printFunc = funcref(JSON, "print") # stupid hack to prevent print( from turning into customPrnt( in finapse, curse you godot
+	var convertedPresetData = printFunc.call_func(canvasPresetData)
+	var file = File.new()
+	file.open("user://gameboy_canvas_presets.json", File.WRITE)
+	file.store_string(convertedPresetData)
+	file.close()
+
+func readCanvasPresets():
+	var file = File.new()
+	
+	if not file.file_exists("user://gameboy_canvas_presets.json"): 
+		writeCanvasPresets("{}")
+		return {}
+	file.open("user://gameboy_canvas_presets.json", File.READ)
+	
+	var content = file.get_as_text()
+	var jsonResult = JSON.parse(content).result
+	file.close()
+
+	if not typeof(jsonResult) == TYPE_DICTIONARY: 
+		writeCanvasPresets("{}")
+		return {}
+
+	return jsonResult
 
 
 func _input(event): # this sucks
@@ -514,7 +608,6 @@ func setAudioToggle(audioEnabled):
 
 func setColorThreshold(colorThreshold):
 	sendMessage("setcolorthreshold|" + colorThreshold if colorThreshold != "" else "4000")
-
 
 
 func clientConnected(id, protocol):

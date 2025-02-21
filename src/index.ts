@@ -7,11 +7,8 @@ import { PNG } from "pngjs";
 import { WebSocket } from "ws";
 import {deflate} from "pako"; 
 
-// TODO: modify serverboy to expose separate channel audio frequencies and send data to client
-
 
 const romName: string = "Mario Tennis.gbc";
-
 
 const PORT = 24897;
 const WIDTH = 160, HEIGHT = 144; // gameboy resolution

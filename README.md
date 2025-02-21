@@ -19,11 +19,13 @@ all commands below except for the regular button commands can only be used by yo
 
 `a, b, start, select` - self explanatory
 
+## 
+
 `save` - create a save state (must be done after saving ingame!)
 
 `abort` - stops the emulator, deletes the canvases and deletes the GDScript
   
-`speed [integer]` - change emulation speed
+`speed [integer]` - change emulation speed (only positive integers currently)
   
 `holdtime [integer]` - change the button hold duration, 10 is default
 
@@ -32,3 +34,15 @@ all commands below except for the regular button commands can only be used by yo
 `chalksmod [true/false/on/off]` - toggles the [Chalks mod](https://thunderstore.io/c/webfishing/p/hostileonion/chalks/) extended color palette
 
 `colorthreshold [integer]` - changes the accepted distance between colors to be accepted, 4000 is default 
+
+`octave [channel 1-3] [integer]` - offsets the notes on the audio channel in half octave steps, e.g. octave 1 -3 to put more sounds into a listenable range
+
+`audio true/false/on/off` - turns audio on or off
+
+`getpresets` - prints a list of saved presets
+
+`savepreset [name]` - saves current controller and screen positions to preset of `[name]`
+
+`loadpreset [name]` - loads the chosen preset (if it exists)
+
+`deletepreset [name]` - deletes the preset (if it exists)
