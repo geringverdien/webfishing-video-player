@@ -8,7 +8,7 @@ import { WebSocket } from "ws";
 import {deflate} from "pako"; 
 
 
-const romName: string = "Mario Tennis.gbc";
+const romName: string = "4in1.gb";
 
 const PORT = 24897;
 const WIDTH = 160, HEIGHT = 144; // gameboy resolution
