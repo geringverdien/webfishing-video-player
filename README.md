@@ -3,7 +3,7 @@ uses serverboy on a websocket backend to send screen data to WEBFISHING which re
 
 # how to use
 0. clone the repository and open it in an ide, i use Visual Studio Code
-1. download my mod [FinapseX](https://thunderstore.io/c/webfishing/p/TeamFishnet/FinapseX/) to run the gameboy.gd script, i recommend also getting the [vscode extension](https://github.com/geringverdien/TeamFishnet/raw/refs/heads/main/Finapse%20X/Finapse%20Xecutor/finapse-xecute/finapse-xecute-0.0.1.vsix) for easier use
+1. download my mod [FinapseX](https://thunderstore.io/c/webfishing/p/TeamFishnet/FinapseX/) to run the gameboy.gd script, i recommend also getting the [vscode extension](https://github.com/geringverdien/TeamFishnet/raw/refs/heads/main/Finapse%20X/Finapse%20Xecutor/finapse-xecute/finapse-xecute-0.0.1.vsix) for easier use (make sure the websocket option is enabled for Finapse X in TackleBox)
 2. join a lobby
 3. run the gameboy.gd script using finapse
 4. make sure you installed all the packages needed for the emulator backend using `yarn install`
