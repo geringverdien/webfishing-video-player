@@ -1,3 +1,5 @@
+//TODO: switch compression to better algorithm, contain uncompressed buffer size in packet, use manual decompress in gdscript
+
 import Gameboy from '../serverboy/src/interface'; // Import the default export
 import { KEYMAP } from '../serverboy/src/interface'; // Import named exports if needed
 import { readFileSync, writeFileSync, existsSync } from "fs";

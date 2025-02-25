@@ -27,7 +27,7 @@ all commands below except for the regular button commands can only be used by yo
 
 `abort` - stops the emulator, deletes the canvases and deletes the GDScript
   
-`speed [integer]` - change emulation speed (only positive integers currently)
+`speed [integer]` - change emulation speed (only positive integers currently) 
   
 `holdtime [integer]` - change the button hold duration, 10 is default
 
