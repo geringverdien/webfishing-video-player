@@ -1,6 +1,8 @@
 # webfishing GB integration
 uses serverboy on a websocket backend to send screen data to WEBFISHING which renders it using chalk canvases and sends back input data to the emulator
 
+if you would like to show support for developing this fun project check out [my kofi](https://ko-fi.com/quirkycmd) :3
+
 # how to use
 0. clone the repository and open it in an ide, i use Visual Studio Code
 1. download my mod [FinapseX](https://thunderstore.io/c/webfishing/p/TeamFishnet/FinapseX/) to run the gameboy.gd script, i recommend also getting the [vscode extension](https://github.com/geringverdien/TeamFishnet/raw/refs/heads/main/Finapse%20X/Finapse%20Xecutor/finapse-xecute/finapse-xecute-0.0.1.vsix) for easier use (make sure the websocket option is enabled for Finapse X in TackleBox)
