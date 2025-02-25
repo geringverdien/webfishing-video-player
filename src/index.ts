@@ -349,7 +349,7 @@ socket.onopen = () => {
 		if (socket.readyState !== WebSocket.OPEN) { return }
 		socket.send(compressedBuffer);
   
-	}, intervalTime); 
+	}, intervalTime);
 
 	const audioInterval = setInterval(() => {
 		if (!audioOutput) { return }
