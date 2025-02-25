@@ -8,14 +8,19 @@ if you would like to show support for developing this fun project check out [my 
 * Node.js and Yarn are installed on your pc, any steps including yarn can also be done with npm though
 * My mod [FinapseX](https://thunderstore.io/c/webfishing/p/TeamFishnet/FinapseX/) is installed, the "websocket" setting was enabled in the "mods" menu and the game was restarted to make the setting change apply
 * The [vscode extension](https://github.com/geringverdien/TeamFishnet/raw/refs/heads/main/Finapse%20X/Finapse%20Xecutor/finapse-xecute/finapse-xecute-0.0.1.vsix) for Finapse was installed to run the .gd file from inside vsc
+* This repository was cloned to a local directory so that updates to the code can be synced easily
+* You ran `yarn install` in the cloned repo's directory to install all necessary packages
 
 #### Usage:
-1. join a lobby
-2. run the gameboy.gd script using finapse. You can already move around the screen if you want to
-3. make sure you installed all the packages needed for the emulator backend using `yarn install`
-4. place a rom you want to load into the "roms" folder in the root directory and change the romName variable at the top of the TypeScript file to point to the rom's file name (e.g. `const romName: string = "pokemoncrystal.gbc"`).
-5. run the `yarn start` command. This will create a nodemon session. Saving changes in the `index.ts` will automatically stop the running code and reboot the emulator
-6. the controller image and gameboy screen output should now load on the canvases that were spawned underneath you in step 2
+1. Join a lobby
+2. Run the **gameboy.gd** script using Finapse. You can already move around the screen if you want to.
+3. Place a ROM file (.gb or .gbc, gba games are not supported) you want to load into the "roms" folder in the root directory if you did not add the game to the folder already.
+4. Change the `romName` variable at the top of the TypeScript file to point to the rom's file name:
+    ```ts 
+    const romName: string = "pokemoncrystal.gbc"
+    ```
+5. Run the `yarn start` command. This will create a nodemon session. Saving changes in the `index.ts` will automatically stop the running code and reboot the emulator.
+6. The controller image and gameboy screen output should now load on the canvases that were spawned underneath you in step 2.
 
 ## screen controls
 `I, J, K, L` - move screen forwards, left, backwards, right (direction does not change with your character orientation)
