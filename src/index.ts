@@ -1,4 +1,4 @@
-//TODO: switch compression to better algorithm, contain uncompressed buffer size in packet, use manual decompress in gdscript
+//TODO: DECREASED PERFORMANCE AT LAST ATTEMPT-switch compression to better algorithm, contain uncompressed buffer size in packet, use manual decompress in gdscript- 
 
 import Gameboy from '../serverboy/src/interface'; // Import the default export
 import { KEYMAP } from '../serverboy/src/interface'; // Import named exports if needed
@@ -10,7 +10,7 @@ import { WebSocket } from "ws";
 import {deflate} from "pako"; 
 
 
-const romName: string = "4in1.gb";
+const romName: string = "pokemoncrystal.gbc";
 
 const PORT = 24897;
 const WIDTH = 160, HEIGHT = 144; // gameboy resolution
