@@ -55,6 +55,7 @@ var validCommands = [
 	"savepreset", # savepreset [name], saves the current screen and controller locations
 	"loadpreset", # loadpreset [name], loads the screen and controller locations
 	"deletepreset", # deletepreset [name], deletes the saved preset
+	"lockinput" # lockinput true/false/on/off, locks or unlocks input by other players
 ]
 
 var inputValues = {
@@ -102,6 +103,8 @@ var oldAudioChannelData = { # amplitude, frequency
 	2: [0, 0],
 	3: [0, 0]
 }
+
+var inputLocked = false
 
 var oldMessages = Network.LOCAL_GAMECHAT_COLLECTIONS.duplicate()
 
@@ -220,6 +223,7 @@ func isJumping(p):
 
 func handleInput(content, sender, args):
 	var isSelf = sender == Network.STEAM_USERNAME
+	if not isSelf and inputLocked: return
 	match content:
 		"u":
 			sendInput("UP")
@@ -308,6 +312,11 @@ func handleInput(content, sender, args):
 			presets.erase(presetName)
 			writeCanvasPresets(presets)
 			print("deleted preset " + presetName)
+		"lockinput":
+			if not isSelf: return
+			var lockInput = args[0].to_lower()
+			setInputLock(lockInput)
+
 
 func getCanvasPresetNames():
 	var presets = readCanvasPresets()
@@ -534,6 +543,7 @@ func createDetectionArea(position: Vector3, rotOffset: Vector3, size: Vector3, k
 
 func onBodyEntered(body: Node, key: String):
 	if not "player" in body.name.to_lower(): return
+	if inputLocked and body != lp: return
 	#if isJumping(body): return
 
 	sendKeyDown(key)
@@ -541,6 +551,7 @@ func onBodyEntered(body: Node, key: String):
 
 func onBodyExited(body: Node, key: String):
 	if not "player" in body.name.to_lower(): return
+	if inputLocked and body != lp: return
 	#if isJumping(body): return
 
 	sendKeyUp(key)
@@ -609,6 +620,9 @@ func setAudioToggle(audioEnabled):
 func setColorThreshold(colorThreshold):
 	sendMessage("setcolorthreshold|" + colorThreshold if colorThreshold != "" else "4000")
 
+func setInputLock(lockInput):
+	inputLocked = (lockInput == "true" or lockInput == "on")
+	print("input locked" if inputLocked else "input unlocked")
 
 func clientConnected(id, protocol):
 	print("client %d connected with protocol: %s" % [id, protocol])
