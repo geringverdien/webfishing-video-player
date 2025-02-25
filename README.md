@@ -4,17 +4,29 @@ uses serverboy on a websocket backend to send screen data to WEBFISHING which re
 if you would like to show support for developing this fun project check out [my kofi](https://ko-fi.com/quirkycmd) :3
 
 # how to use
-0. clone the repository and open it in an ide, i use Visual Studio Code
-1. download my mod [FinapseX](https://thunderstore.io/c/webfishing/p/TeamFishnet/FinapseX/) to run the gameboy.gd script, i recommend also getting the [vscode extension](https://github.com/geringverdien/TeamFishnet/raw/refs/heads/main/Finapse%20X/Finapse%20Xecutor/finapse-xecute/finapse-xecute-0.0.1.vsix) for easier use (make sure the websocket option is enabled for Finapse X in TackleBox)
-2. join a lobby
-3. run the gameboy.gd script using finapse
-4. make sure you installed all the packages needed for the emulator backend using `yarn install`
-5. place a rom you want to load into the "roms" folder in the root directory and change the romName in the TypeScript file to point to the rom's file name.
-6. start up the index.ts file using the `yarn start` command, it uses nodemon to live update when making changes to the index file which lets you quickly reload the emulator
-7. you can now control the screen position using IJKL for sides and UO for down and up, arrow keys to rotate and bring it (as well as the controller) to you with `.`
-8. use the commands in local chat or the controller on the floor to control the emulator
+#### Prerequisites to be able to follow this guide (only need to be done once):
+* Node.js and Yarn are installed on your pc, any steps including yarn can also be done with npm though
+* My mod [FinapseX](https://thunderstore.io/c/webfishing/p/TeamFishnet/FinapseX/) is installed, the "websocket" setting was enabled in the "mods" menu and the game was restarted to make the setting change apply
+* The [vscode extension](https://github.com/geringverdien/TeamFishnet/raw/refs/heads/main/Finapse%20X/Finapse%20Xecutor/finapse-xecute/finapse-xecute-0.0.1.vsix) for Finapse was installed to run the .gd file from inside vsc
 
-## controls
+#### Usage:
+1. join a lobby
+2. run the gameboy.gd script using finapse. You can already move around the screen if you want to
+3. make sure you installed all the packages needed for the emulator backend using `yarn install`
+4. place a rom you want to load into the "roms" folder in the root directory and change the romName variable at the top of the TypeScript file to point to the rom's file name (e.g. `const romName: string = "pokemoncrystal.gbc"`).
+5. run the `yarn start` command. This will create a nodemon session. Saving changes in the `index.ts` will automatically stop the running code and reboot the emulator
+6. the controller image and gameboy screen output should now load on the canvases that were spawned underneath you in step 2
+
+## screen controls
+`I, J, K, L` - move screen forwards, left, backwards, right (direction does not change with your character orientation)
+
+`U, O` - move screen down and up
+
+`arrow keys` - rotate screen
+
+`.` - teleport the controller and screen to your current position
+
+## chat commands (only work in local chat)
 all commands below except for the regular button commands can only be used by yourself:
 
 `u, d, l, r/up, down, left, right` - dpad 
@@ -48,3 +60,5 @@ all commands below except for the regular button commands can only be used by yo
 `loadpreset [name]` - loads the chosen preset (if it exists)
 
 `deletepreset [name]` - deletes the preset (if it exists)
+
+`lockinput true/false/on/off` - disables all input from other players, useful if you want to save progress while people are running over the gamepad
