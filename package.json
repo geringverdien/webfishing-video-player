@@ -2,8 +2,11 @@
   "name": "gameboy-emulator",
   "packageManager": "yarn@4.5.2",
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.4",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "fluent-ffmpeg": "^2.1.3",
     "fs": "^0.0.1-security",
-    "midi": "^2.0.0",
+    "jimp": "^1.6.0",
     "pako": "^2.1.0",
     "path": "^0.12.7",
     "pngjs": "^7.0.0",
@@ -12,7 +15,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@types/midi": "^2",
+    "@types/fluent-ffmpeg": "^2",
     "@types/node": "^22.13.1",
     "@types/pako": "^2",
     "@types/pngjs": "^6.0.5",

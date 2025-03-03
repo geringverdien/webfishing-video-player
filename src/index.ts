@@ -1,38 +1,25 @@
-//TODO: DECREASED PERFORMANCE AT LAST ATTEMPT-switch compression to better algorithm, contain uncompressed buffer size in packet, use manual decompress in gdscript- 
-
-import Gameboy from '../serverboy/src/interface'; // Import the default export
-import { KEYMAP } from '../serverboy/src/interface'; // Import named exports if needed
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import "ws";
 import * as path from "path";
 import { PNG } from "pngjs";
 import { WebSocket } from "ws";
-import {deflate} from "pako"; 
+import { deflate } from "pako"; 
+import ytdl from "@distube/ytdl-core";
+import ffmpeg from "fluent-ffmpeg";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
+import { Jimp} from "jimp";
+import { PassThrough } from "stream"
+import { parentPort } from 'worker_threads';
 
-
-const romName: string = "pokemoncrystal.gbc";
+const FRAMERATE = 30; // video target fps, doesnt have to match real video fps
+const videoURL: string = "https://www.youtube.com/watch?v=RHuQqLxmEyg";
 
 const PORT = 24897;
-const WIDTH = 160, HEIGHT = 144; // gameboy resolution
-const EMULATOR_HZ = 120; // emulator runs at 120 refresh rate
-const FRAMERATE = 30; // gameboy runs at ~60 fps
-let inputHoldTime = 10;
-let gameSpeed = 1; // use ingame command "speed num" to speed up, must be integer
+const WIDTH = 200, HEIGHT = 200; // 1 canvas
+
+const pixelsPerBuffer = 100*100; // if amount of pixels per frame surpasses this, split it into a separate buffer
 const useChalksColorPalette = false // toggled ingame using "chalksmod true/false/on/off", causes the fps to drop drastically
 let colorDistanceThreshold = 4000; // use ingame command "colorthreshold num" to change, helps with low fps when using Chalks colors while sacrificing color accuracy
-let audioOutput = false; // use ingame command "audio true/false/on/off" to toggle audio output	
-
-const gameboy = new Gameboy();
-const romPath: string = path.join(__dirname, "..", "roms", romName);
-const savePath: string = path.join(__dirname, "..", "saves", romName + ".sav")
-const controllerPath: string = path.join(__dirname, "..", "controller.png")
-const rom = readFileSync(romPath);
-const controllerImage = readFileSync(controllerPath)
-let saveData: number[] | undefined = undefined;
-
-if (existsSync(savePath)) {
-	saveData = getSaveFile();
-}
 
 const vanillaColorPalette: { [key: number]: number[] } = {
 	0: [255, 238, 218], // white
@@ -109,25 +96,29 @@ const chalksModColorPalette: { [key: number]: [number, number, number] } = {
 
 var usedColorPalette = useChalksColorPalette ? chalksModColorPalette : vanillaColorPalette;
 
-type keyStates = {
-	[key: string]: [number, boolean];
-};
+let oldPixels = Array(WIDTH*HEIGHT);
 
-let keyStates: keyStates = {
-	"UP": [0, false],
-	"DOWN": [0, false],
-	"LEFT": [0, false],
-	"RIGHT": [0, false],
-	"B": [0, false],
-	"A": [0, false],
-	"START": [0, false],
-	"SELECT": [0, false]
-}
+console.log("downloading video...")
+const videoStream = ytdl(videoURL, { quality: "lowestvideo" });
+console.log("video downloaded")
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+const frameStream = new PassThrough();
 
-let oldPixels = Array(23040);
+ffmpeg(videoStream)
+    .on("start", () => console.log("Processing video..."))
+    .on("error", (err) => console.error("Error:", err))
+    .on("end", () => console.log("Video processing finished."))
+    .outputOptions([
+        "-preset", "ultrafast",
+        "-vf", `fps=${FRAMERATE},scale=200:200:force_original_aspect_ratio=decrease`, // Process fewer frames but maintain timing
+        "-r", `${FRAMERATE}`, // Set output framerate
+        "-f", "image2pipe",
+        "-c:v", "png",
+    ])
+    .output(frameStream) // Pipe frames to the PassThrough stream
+    .run();
 
-
-function createDataBuffer(pixelArray: number[]): ArrayBuffer {
+function createDataBuffers(pixelArray: number[]): ArrayBuffer[] {
 	const changedPixels: Array<any> = [];
 
 	for (let i = 0; i < pixelArray.length; i += 4) {
@@ -144,6 +135,7 @@ function createDataBuffer(pixelArray: number[]): ArrayBuffer {
 		if (a === 0) { 
 			continue 
 		};
+		
 		const colorPaletteIndex = findClosestColor([r, g, b]);
 
 		if (oldPixels[pixelIndex] === colorPaletteIndex) {
@@ -154,87 +146,40 @@ function createDataBuffer(pixelArray: number[]): ArrayBuffer {
 		changedPixels.push([x, y, colorPaletteIndex]);
 	}
 
-	const buffer = new ArrayBuffer(changedPixels.length * 3 + 1);
-	const view = new Uint8Array(buffer);
+	const buffers: ArrayBuffer[] = [];
 	
-	for (let i = 0; i < changedPixels.length; i++) {
+	// First buffer (up to 22500 pixels)
+	const firstBufferSize = Math.min(changedPixels.length, pixelsPerBuffer);
+	const buffer1 = new ArrayBuffer(firstBufferSize * 3);
+	const view1 = new Uint8Array(buffer1);
+	
+	for (let i = 0; i < firstBufferSize; i++) {
 		const pixel = changedPixels[i];
-		view[i * 3] = pixel[0];     // x
-		view[i * 3 + 1] = pixel[1]; // y
-		view[i * 3 + 2] = pixel[2]; // color
+		view1[i * 3] = pixel[0];     // x
+		view1[i * 3 + 1] = pixel[1]; // y
+		view1[i * 3 + 2] = pixel[2]; // color
+	}
+
+	const compressedBuffer1 = deflate(buffer1, { raw: false });
+	buffers.push(compressedBuffer1);
+	
+	if (changedPixels.length > pixelsPerBuffer) {
+		const remainingPixels = changedPixels.length - pixelsPerBuffer;
+		const buffer2 = new ArrayBuffer(remainingPixels * 3);
+		const view2 = new Uint8Array(buffer2);
+		
+		for (let i = 0; i < remainingPixels; i++) {
+			const pixel = changedPixels[pixelsPerBuffer + i];
+			view2[i * 3] = pixel[0];     // x
+			view2[i * 3 + 1] = pixel[1]; // y
+			view2[i * 3 + 2] = pixel[2]; // color
+		}
+
+		const compressedBuffer2 = deflate(buffer2, { raw: false });
+		buffers.push(compressedBuffer2);
 	}
 	
-	view[view.length - 1] = 0;
-	
-	return buffer;
-}
-
-function createControllerPixelBuffer(pixelArray: number[]): ArrayBuffer {
-	const changedPixels: Array<any> = [];
-
-	for (let i = 0; i < pixelArray.length; i += 4) {
-		const pixelIndex = i / 4;
-		const x = pixelIndex % 200;
-		const y = Math.floor(pixelIndex / 200);
-
-		//if (y >= HEIGHT) continue;
-
-		const r = pixelArray[i];
-		const g = pixelArray[i + 1];
-		const b = pixelArray[i + 2];
-		const a = pixelArray[i + 3];
-		if (a === 0) { 
-			continue 
-		};
-		const colorPaletteIndex = findClosestColor([r, g, b]);
-		changedPixels.push([x, y, colorPaletteIndex]);
-	}
-
-	const buffer = new ArrayBuffer(changedPixels.length * 3 + 1);
-	const view = new Uint8Array(buffer);
-
-	for (let i = 0; i < changedPixels.length; i++) {
-		const pixel = changedPixels[i];
-		view[i * 3] = pixel[0];     // x
-		view[i * 3 + 1] = pixel[1]; // y
-		view[i * 3 + 2] = pixel[2]; // color
-	}
-
-	view[view.length - 1] = 0;
-
-	return buffer;
-}
-
-function createControllerBuffer(): ArrayBuffer {
-	const imageDataBuffer = PNG.sync.read(controllerImage).data;
-	const imageDataArray = Buffer.from(imageDataBuffer).toJSON().data;
-	const buffer = createControllerPixelBuffer(imageDataArray);
-	console.log(buffer.byteLength)
-	const compressedControllerBuffer = deflate(buffer, { raw: false });
-	return compressedControllerBuffer;
-}
-
-function frequencyToMidiNote(frequency: number): number {
-	const noteNumber = 12 * Math.log2(frequency / 440) + 69;
-	return Math.round(noteNumber);
-	
-  }
-
-function createAudioDataBuffer(audioData: number[][]): ArrayBuffer {
-	const audioBuffer = new ArrayBuffer(audioData.length*2 + 1);
-	const view = new Uint8Array(audioBuffer);
-	for (let i = 0; i < audioData.length; i++) {
-		const channelData = audioData[i];
-		const isPlayingFlag = channelData[0]
-		const frequency = channelData[1]
-		const notePitch = frequency > 0 ? frequencyToMidiNote(frequency) : 0;
-		view[i * 2] = isPlayingFlag;
-		view[i * 2 + 1] = notePitch; // note pitch
-	}
-
-	view[view.length - 1] = 1;
-	const compressedControllerBuffer = deflate(audioBuffer, { raw: false });
-	return compressedControllerBuffer;
+	return buffers;
 }
 
 function findClosestColor(target: number[]): number {
@@ -260,107 +205,79 @@ function findClosestColor(target: number[]): number {
 	return closestKey;
 }
 
-function getPressedKeys(): number[] {
-	const currentlyPressed: number[] = [];
-
-	for (const [keyName, keyData] of Object.entries(keyStates)) {
-		const framesRemaining = keyData[0]
-		const isHeldDown = keyData[1]
-		const hasZeroTicks = framesRemaining === 0
-		if (hasZeroTicks && isHeldDown === false) {
-			continue;
-		}
-		
-		if (!hasZeroTicks) {
-			keyStates[keyName][0] -= 1;
-		}
-		
-		const key = keyName as keyof typeof KEYMAP;
-
-		currentlyPressed.push(KEYMAP[key]);
-	}
-	//if (currentlyPressed.length > 0) {console.log(currentlyPressed) };
-	return currentlyPressed;
-}
-
-function sramToBuffer(integers: number[]): Buffer {
-	const buffer = Buffer.alloc(integers.length * 4);
-
-	for (let i = 0; i < integers.length; i++) {
-		buffer.writeInt32BE(integers[i], i * 4);
-	}
-
-	return buffer;
-}
-
-function saveSRAM(integers: number[]): void {
-	const buffer = sramToBuffer(integers);
-	writeFileSync(savePath, buffer);
-}
-
-function bufferToIntegers(buffer: Buffer): number[] {
-	const integers: number[] = [];
-
-	for (let i = 0; i < buffer.length; i += 4) {
-		const integer = buffer.readInt32BE(i);
-		integers.push(integer);
-	}
-
-	return integers;
-}
-
-function getSaveFile(): number[] {
-	const buffer = readFileSync(savePath);
-	return bufferToIntegers(buffer);
-}
-
-function storeSaveData() {
-	const sram = gameboy.getSaveData()
-	saveSRAM(sram)
-}
-
-
 const socket = new WebSocket("ws://127.0.0.1:" + PORT.toString());
 
-gameboy.loadRom(rom, saveData)
+var frameQueue: ArrayBuffer[][] = [];
+
+setInterval(() => {
+	if (frameQueue.length > 1 && socket.readyState === WebSocket.OPEN) {
+		const frame = frameQueue.shift();
+		if (frame === undefined) { return }
+
+		console.log(`Sending frame with ${frame.length} buffers`);
+		for (const buffer of frame) {
+			socket.send(buffer);
+		}
+	}
+}, 1000 / FRAMERATE);
+
+const MAX_BUFFER_SIZE = 50 * 1024 * 1024; // 50MB example limit
+let frameBuffer = Buffer.alloc(MAX_BUFFER_SIZE);
+
+let isProcessing = false;
+let frameCount = 0;
+
+frameStream.on("data", async (chunk) => {
+	try {
+		if (socket.readyState !== WebSocket.OPEN) { 
+			return;
+		}
+
+		//console.log(`Received chunk of size: ${chunk.length}`);
+		
+		const chunkCopy = Buffer.from(chunk);
+		frameBuffer = Buffer.concat([frameBuffer, chunkCopy]);
+
+		//console.log(`Current frame buffer size: ${frameBuffer.length}`);
+
+		while (frameBuffer.includes(Buffer.from("IEND")) && !isProcessing) {
+			isProcessing = true;
+			const frameEnd = frameBuffer.indexOf(Buffer.from("IEND")) + 8;
+			const frame = frameBuffer.subarray(0, frameEnd);
+			frameBuffer = frameBuffer.subarray(frameEnd);
+
+			console.log(`Processing frame ${++frameCount}`);
+
+			try {
+				const image = await Jimp.read(Buffer.from(frame));
+				const pixelData = image.bitmap.data;
+
+				const dataBuffers = createDataBuffers(Array.from(pixelData));
+				frameQueue.push(dataBuffers);
+				
+			} catch (err) {
+				console.error("Error processing frame:", err);
+			} finally {
+				isProcessing = false;
+			}
+		}
+	} catch (err) {
+		console.error("Error in frame processing:", err);
+		isProcessing = false;
+	}
+});
+
+frameStream.on("end", () => {
+	console.log("Frame stream ended");
+	console.log(`frame amount: ${frameQueue.length}`);
+});
+
+frameStream.on("error", (err) => {
+	console.error("Frame stream error:", err);
+});
 
 socket.onopen = () => {
 	console.log("WebSocket connection opened");
-	const intervalTime = 1000 / FRAMERATE;
-	
-	const stepsPerInterval = EMULATOR_HZ / FRAMERATE;
-	let frameCount = 0
-
-	const controllerData = createControllerBuffer();
-	socket.send(controllerData);
-
-
-	const frameInterval = setInterval(() => {
-		for (let i = 0; i < (stepsPerInterval * gameSpeed); i++) {
-			gameboy.pressKeys(getPressedKeys());
-			gameboy.doFrame();
-		}
-
-		const frame: number[] = gameboy.getScreen();
-		const rawBuffer = createDataBuffer(frame);
-		const compressedBuffer = deflate(rawBuffer, { raw: false });
-   
-		
-		if (socket.readyState !== WebSocket.OPEN) { return }
-		socket.send(compressedBuffer);
-  
-	}, intervalTime);
-
-	const audioInterval = setInterval(() => {
-		if (!audioOutput) { return }
-		const audioData = gameboy.getAudio();
-		//console.log(audioData)
-		const buffer = createAudioDataBuffer(audioData)
-
-		if (socket.readyState !== WebSocket.OPEN) { return }
-		socket.send(buffer);
-	}, intervalTime)
-
 	socket.onmessage = (event) => {
 		let message: string = event.data.toString();
 		console.log("MESSAGE: " + message);
@@ -369,31 +286,6 @@ socket.onopen = () => {
 		console.log(command);
 		const args = splitMessage.slice(1);
 		switch (command) {
-			case "input":
-				var keyString: any = args[0];
-				keyStates[keyString][0] = inputHoldTime;
-				break;
-			case "keydown":
-				var keyString: any = args[0];
-				keyStates[keyString][1] = true;
-				break;
-			case "keyup":
-				var keyString: any = args[0];
-				keyStates[keyString][1] = false;
-				break;
-			case "savegame":
-				console.log("saving state");
-				storeSaveData();
-				break;
-			case "setspeed":
-				var newSpeed = Math.floor(Number(args[0]));
-				console.log(`set speed to ${newSpeed}`);
-				gameSpeed = newSpeed;
-				break;
-			case "setholdtime":
-				var newHoldTime = Math.floor(Number(args[0]));
-				inputHoldTime = newHoldTime;
-				break;
 			case "setchalkmode":
 				var useModdedChalk = args[0] === "true";
 				usedColorPalette = useModdedChalk ? chalksModColorPalette : vanillaColorPalette;
@@ -402,35 +294,11 @@ socket.onopen = () => {
 				var newThreshold = Math.floor(Number(args[0]));
 				colorDistanceThreshold = newThreshold;
 				break;
-			case "setaudio":
-				var audioToggle = args[0] === "true";
-				audioOutput = audioToggle;
-				break;
 		}
 	}
 
 	socket.onclose = () => {
-		clearInterval(frameInterval);
+		//clearInterval(frameInterval);
 		console.log("WebSocket connection closed");
-	}
-
-
+	};
 }
-
-/**
-
-let pixels = gameboy.getScreen()
-
-let png = new PNG({ width: 160, height: 144 });
-
-for (let i=0; i < 50; i++) {
-	gameboy.doFrame()
-}
-
-for (let i=0; i<pixels.length; i++) {
-   png.data[i] = pixels[i];
-}
-
-let buffer = PNG.sync.write(png);
-writeFileSync("out.png", buffer);
-*/
