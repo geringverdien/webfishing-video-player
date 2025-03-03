@@ -1,25 +1,22 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import "ws";
-import * as path from "path";
-import { PNG } from "pngjs";
 import { WebSocket } from "ws";
-import { deflate } from "pako"; 
+import path from "path";
 import ytdl from "@distube/ytdl-core";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
-import { Jimp} from "jimp";
-import { PassThrough } from "stream"
-import { parentPort } from 'worker_threads';
+import { PassThrough } from "stream";
+import { Worker } from "worker_threads";
+import { fileURLToPath } from "url";
 
-const FRAMERATE = 30; // video target fps, doesnt have to match real video fps
+const FRAMERATE = 20; // video target fps, doesnt have to match real video fps
 const videoURL: string = "https://www.youtube.com/watch?v=RHuQqLxmEyg";
 
 const PORT = 24897;
-const WIDTH = 200, HEIGHT = 200; // 1 canvas
+const WIDTH = 200, HEIGHT = 200; // 200,200 for 1 canvas, 400,400 for 2 canvases
 
-const pixelsPerBuffer = 100*100; // if amount of pixels per frame surpasses this, split it into a separate buffer
+// TODO: make commands actually work, data stream event is blocking the event loop for receiving messages
 const useChalksColorPalette = false // toggled ingame using "chalksmod true/false/on/off", causes the fps to drop drastically
 let colorDistanceThreshold = 4000; // use ingame command "colorthreshold num" to change, helps with low fps when using Chalks colors while sacrificing color accuracy
+
 
 const vanillaColorPalette: { [key: number]: number[] } = {
 	0: [255, 238, 218], // white
@@ -94,15 +91,22 @@ const chalksModColorPalette: { [key: number]: [number, number, number] } = {
     61: [255, 231, 209]
 };
 
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 var usedColorPalette = useChalksColorPalette ? chalksModColorPalette : vanillaColorPalette;
 
-let oldPixels = Array(WIDTH*HEIGHT);
-
+const socket = new WebSocket("ws://127.0.0.1:" + PORT.toString());
 console.log("downloading video...")
 const videoStream = ytdl(videoURL, { quality: "lowestvideo" });
 console.log("video downloaded")
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+
 const frameStream = new PassThrough();
+const frameProcessor = new Worker(path.join(__dirname,"/frameProcessor.worker.ts"));
+var frameQueue: ArrayBuffer[][] = [];
+
 
 ffmpeg(videoStream)
     .on("start", () => console.log("Processing video..."))
@@ -110,166 +114,99 @@ ffmpeg(videoStream)
     .on("end", () => console.log("Video processing finished."))
     .outputOptions([
         "-preset", "ultrafast",
-        "-vf", `fps=${FRAMERATE},scale=200:200:force_original_aspect_ratio=decrease`, // Process fewer frames but maintain timing
-        "-r", `${FRAMERATE}`, // Set output framerate
+        "-vf", `fps=${FRAMERATE},scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=decrease`,
+        "-r", `${FRAMERATE}`,
         "-f", "image2pipe",
         "-c:v", "png",
     ])
-    .output(frameStream) // Pipe frames to the PassThrough stream
+    .output(frameStream)
     .run();
-
-function createDataBuffers(pixelArray: number[]): ArrayBuffer[] {
-	const changedPixels: Array<any> = [];
-
-	for (let i = 0; i < pixelArray.length; i += 4) {
-		const pixelIndex = i / 4;
-		const x = pixelIndex % WIDTH;
-		const y = Math.floor(pixelIndex / WIDTH);
-
-		//if (y >= HEIGHT) continue;
-
-		const r = pixelArray[i];
-		const g = pixelArray[i + 1];
-		const b = pixelArray[i + 2];
-		const a = pixelArray[i + 3];
-		if (a === 0) { 
-			continue 
-		};
-		
-		const colorPaletteIndex = findClosestColor([r, g, b]);
-
-		if (oldPixels[pixelIndex] === colorPaletteIndex) {
-			continue;
-		}
-
-		oldPixels[pixelIndex] = colorPaletteIndex;
-		changedPixels.push([x, y, colorPaletteIndex]);
-	}
-
-	const buffers: ArrayBuffer[] = [];
 	
-	// First buffer (up to 22500 pixels)
-	const firstBufferSize = Math.min(changedPixels.length, pixelsPerBuffer);
-	const buffer1 = new ArrayBuffer(firstBufferSize * 3);
-	const view1 = new Uint8Array(buffer1);
-	
-	for (let i = 0; i < firstBufferSize; i++) {
-		const pixel = changedPixels[i];
-		view1[i * 3] = pixel[0];     // x
-		view1[i * 3 + 1] = pixel[1]; // y
-		view1[i * 3 + 2] = pixel[2]; // color
-	}
+	frameProcessor.postMessage({
+		type: "init",
+		colorPalette: usedColorPalette
+	});
 
-	const compressedBuffer1 = deflate(buffer1, { raw: false });
-	buffers.push(compressedBuffer1);
-	
-	if (changedPixels.length > pixelsPerBuffer) {
-		const remainingPixels = changedPixels.length - pixelsPerBuffer;
-		const buffer2 = new ArrayBuffer(remainingPixels * 3);
-		const view2 = new Uint8Array(buffer2);
-		
-		for (let i = 0; i < remainingPixels; i++) {
-			const pixel = changedPixels[pixelsPerBuffer + i];
-			view2[i * 3] = pixel[0];     // x
-			view2[i * 3 + 1] = pixel[1]; // y
-			view2[i * 3 + 2] = pixel[2]; // color
-		}
+	frameProcessor.on("message", (message) => {
+		switch (message.type) {
+        case "frameProcessed":
+            frameQueue.push(message.dataBuffers);
+            break;
+        case "error":
+            console.error("Worker error:", message.error);
+            break;
+    }
+});
 
-		const compressedBuffer2 = deflate(buffer2, { raw: false });
-		buffers.push(compressedBuffer2);
-	}
-	
-	return buffers;
-}
 
-function findClosestColor(target: number[]): number {
-	let minDistance = Infinity;
-	let closestKey = 0;
+let lastSendTime = Date.now();
+const SEND_INTERVAL = 1000 / FRAMERATE;
+const sendFrame = async () => {
+    const now = Date.now();
+    if (now - lastSendTime < SEND_INTERVAL) {
+        return;
+    }
 
-	for (const [key, color] of Object.entries(usedColorPalette)) {
-	  	const dr = target[0] - color[0];
-	  	const dg = target[1] - color[1];
-	  	const db = target[2] - color[2];
-	  	const distanceSq = dr * dr + dg * dg + db * db;
+    if (frameQueue.length > 0 && socket.readyState === WebSocket.OPEN) {
+        const frame = frameQueue.shift();
+        if (!frame) return;
 
-		if (distanceSq < colorDistanceThreshold) {
-			return Number(key);
-		}
+        try {
+            for (const buffer of frame) {
+                await new Promise<void>((resolve, reject) => {
+                    socket.send(buffer, (error) => {
+                        if (error) reject(error);
+                        else resolve();
+                    });
+                });
+            }
+            lastSendTime = now;
+        } catch (err) {
+            console.error("Error sending frame:", err);
+        }
+    }
+};
 
-	  	if (distanceSq < minDistance) {
-			minDistance = distanceSq;
-			closestKey = Number(key);
-		}
-	}
+const tick = () => {
+    sendFrame().catch(console.error);
+    setTimeout(tick, SEND_INTERVAL / 2);
+};
 
-	return closestKey;
-}
-
-const socket = new WebSocket("ws://127.0.0.1:" + PORT.toString());
-
-var frameQueue: ArrayBuffer[][] = [];
-
-setInterval(() => {
-	if (frameQueue.length > 1 && socket.readyState === WebSocket.OPEN) {
-		const frame = frameQueue.shift();
-		if (frame === undefined) { return }
-
-		console.log(`Sending frame with ${frame.length} buffers`);
-		for (const buffer of frame) {
-			socket.send(buffer);
-		}
-	}
-}, 1000 / FRAMERATE);
-
-const MAX_BUFFER_SIZE = 50 * 1024 * 1024; // 50MB example limit
+const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
 let frameBuffer = Buffer.alloc(MAX_BUFFER_SIZE);
 
 let isProcessing = false;
-let frameCount = 0;
 
 frameStream.on("data", async (chunk) => {
-	try {
-		if (socket.readyState !== WebSocket.OPEN) { 
-			return;
-		}
+    try {
+        if (socket.readyState !== WebSocket.OPEN) {
+            return;
+        }
 
-		//console.log(`Received chunk of size: ${chunk.length}`);
-		
-		const chunkCopy = Buffer.from(chunk);
-		frameBuffer = Buffer.concat([frameBuffer, chunkCopy]);
+        const chunkCopy = Buffer.from(chunk);
+        frameBuffer = Buffer.concat([frameBuffer, chunkCopy]);
 
-		//console.log(`Current frame buffer size: ${frameBuffer.length}`);
+        while (frameBuffer.includes(Buffer.from("IEND")) && !isProcessing) {
+            isProcessing = true;
+            const frameEnd = frameBuffer.indexOf(Buffer.from("IEND")) + 8;
+            const frame = frameBuffer.subarray(0, frameEnd);
+            frameBuffer = frameBuffer.subarray(frameEnd);
 
-		while (frameBuffer.includes(Buffer.from("IEND")) && !isProcessing) {
-			isProcessing = true;
-			const frameEnd = frameBuffer.indexOf(Buffer.from("IEND")) + 8;
-			const frame = frameBuffer.subarray(0, frameEnd);
-			frameBuffer = frameBuffer.subarray(frameEnd);
+            frameProcessor.postMessage({
+                type: "frame",
+                frameData: frame
+            });
 
-			console.log(`Processing frame ${++frameCount}`);
-
-			try {
-				const image = await Jimp.read(Buffer.from(frame));
-				const pixelData = image.bitmap.data;
-
-				const dataBuffers = createDataBuffers(Array.from(pixelData));
-				frameQueue.push(dataBuffers);
-				
-			} catch (err) {
-				console.error("Error processing frame:", err);
-			} finally {
-				isProcessing = false;
-			}
-		}
-	} catch (err) {
-		console.error("Error in frame processing:", err);
-		isProcessing = false;
-	}
+            isProcessing = false;
+        }
+    } catch (err) {
+        console.error("Error in frame processing:", err);
+        isProcessing = false;
+    }
 });
 
 frameStream.on("end", () => {
 	console.log("Frame stream ended");
-	console.log(`frame amount: ${frameQueue.length}`);
 });
 
 frameStream.on("error", (err) => {
@@ -278,27 +215,34 @@ frameStream.on("error", (err) => {
 
 socket.onopen = () => {
 	console.log("WebSocket connection opened");
+	tick();
 	socket.onmessage = (event) => {
 		let message: string = event.data.toString();
-		console.log("MESSAGE: " + message);
 		let splitMessage: any[] = message.split("|");
 		const command = splitMessage[0];
-		console.log(command);
 		const args = splitMessage.slice(1);
 		switch (command) {
 			case "setchalkmode":
 				var useModdedChalk = args[0] === "true";
 				usedColorPalette = useModdedChalk ? chalksModColorPalette : vanillaColorPalette;
+				frameProcessor.postMessage({
+					type: "updatePalette",
+					colorPalette: usedColorPalette
+				});
 				break;
 			case "setcolorthreshold":
 				var newThreshold = Math.floor(Number(args[0]));
 				colorDistanceThreshold = newThreshold;
+				frameProcessor.postMessage({
+					type: "updateThreshold",
+					threshold: newThreshold
+				});
 				break;
 		}
 	}
 
 	socket.onclose = () => {
-		//clearInterval(frameInterval);
+		frameProcessor.terminate();
 		console.log("WebSocket connection closed");
-	};
+	}
 }
