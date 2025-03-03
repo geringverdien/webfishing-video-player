@@ -9,12 +9,6 @@ var fastRotateSpeed = 3000 # shift rotation speed
 
 var offset = Vector3(0,-1,0) # account for player height of 1
 
-var octaveOffsets = [ # half octaves
-	-3,
-	-3,
-	-4
-]
-
 # all commands must be sent in local chat to be used
 var validCommands = [
 	"abort", # stops the websocket, deletes the screen and script.
@@ -407,7 +401,7 @@ func packetToPixels(packet):
 	var convertedData = []
 	for i in range(0, packet.size(), 3):
 		var x = packet[i]
-		var y = packet[i + 1]
+		var y = packet[i + 1] + 44 # center vertically
 		var color = packet[i + 2]
 		convertedData.append([x, y, color])
 	return convertedData
