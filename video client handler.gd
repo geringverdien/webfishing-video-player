@@ -387,6 +387,7 @@ func setColorThreshold(colorThreshold):
 func clientConnected(id, protocol):
 	print("client %d connected with protocol: %s" % [id, protocol])
 	clients[str(id)] = true
+	clearDrawings()
 	#sendMessage(id, "Connection confirmed")
 
 func clientDisconnected(id, cleanExit):
