@@ -8,7 +8,7 @@ import { Worker } from "worker_threads";
 import { fileURLToPath } from "url";
 
 const FRAMERATE = 20; // video target fps, doesnt have to match real video fps
-const videoURL: string = "https://www.youtube.com/watch?v=bN1shALfJqg";
+const videoURL: string = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 
 const PORT = 24897;
 const WIDTH = 200, HEIGHT = 200; // 200,200 for 1 canvas, 400,400 for 2 canvases
