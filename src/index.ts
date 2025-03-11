@@ -104,7 +104,13 @@ console.log("video downloaded")
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 const frameStream = new PassThrough();
-const frameProcessor = new Worker(path.join(__dirname,"/frameProcessor.worker.ts"));
+const frameProcessor = new Worker(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "frameProcessor.worker.ts"),
+    {
+        execArgv: ['--import', 'ts-node/esm'],
+        env: { ...process.env, TS_NODE_PROJECT: path.join(__dirname, '../tsconfig.json') }
+    }
+);
 var frameQueue: ArrayBuffer[][] = [];
 
 
