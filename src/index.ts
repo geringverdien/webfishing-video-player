@@ -5,9 +5,10 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import { PassThrough } from "stream";
 import { Worker } from "worker_threads";
+import { fileURLToPath } from "url";
 
 const FRAMERATE = 20; // video target fps, doesnt have to match real video fps
-const videoURL: string = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+const videoURL: string = "https://www.youtube.com/watch?v=bN1shALfJqg";
 
 const PORT = 24897;
 const WIDTH = 200, HEIGHT = 200; // 200,200 for 1 canvas, 400,400 for 2 canvases
@@ -91,8 +92,8 @@ const chalksModColorPalette: { [key: number]: [number, number, number] } = {
 };
 
 
-//const __filename = fileURLToPath(__dirname);
-//const __dirname = path.dirname(__filename);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 var usedColorPalette = useChalksColorPalette ? chalksModColorPalette : vanillaColorPalette;
 

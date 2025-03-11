@@ -348,7 +348,7 @@ func abort():
 	set_process(false)
 	server.stop()
 	self.queue_free()
-	print("stopped the emulator and backend")
+	print("stopped the video player")
 
 func initWebsocket():
 	#print("ws init")
