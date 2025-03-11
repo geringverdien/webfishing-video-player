@@ -1,6 +1,5 @@
 {
   "name": "video-player",
-  "type": "module",
   "packageManager": "yarn@4.5.2",
   "dependencies": {
     "@distube/ytdl-core": "^4.16.4",
@@ -12,7 +11,6 @@
     "pako": "^2.1.0",
     "path": "^0.12.7",
     "pngjs": "^7.0.0",
-    "ts-node": "^10.9.2",
     "typescript": "^5.7.3",
     "ws": "^8.18.0"
   },
@@ -21,10 +19,11 @@
     "@types/node": "^22.13.1",
     "@types/pako": "^2",
     "@types/pngjs": "^6.0.5",
-    "@types/ws": "^8"
+    "@types/ws": "^8",
+    "tsx": "^4.19.3"
   },
   "scripts": {
     "build": "tsc",
-    "start": "nodemon --watch \"*.ts\" --exec \"ts-node\" ./src/index.ts"
+    "start": "nodemon --watch \"*.ts\" --exec \"tsx\" ./src/index.ts"
   }
 }
