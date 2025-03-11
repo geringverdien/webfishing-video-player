@@ -1,5 +1,6 @@
 {
   "name": "video-player",
+  "type": "module",
   "packageManager": "yarn@4.5.2",
   "dependencies": {
     "@distube/ytdl-core": "^4.16.4",
