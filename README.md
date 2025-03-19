@@ -14,7 +14,7 @@
 #### Usage:
 1. Join a lobby
 2. Run the **video client handler.gd** script using Finapse. You can already move around the screen if you want to.
-3. Change the `videoURL` variable at the top of the TypeScript file to point to a video from a [supported video site](https://github.com/ytdl-org/youtube-dl/blob/master/docs/supportedsites.md):
+3. Change the `videoURL` variable at the top of the TypeScript file to point to a YouTube video:
     ```ts 
     const videoURL: string = "https://www.youtube.com/watch?v=RHuQqLxmEyg"
     ```
