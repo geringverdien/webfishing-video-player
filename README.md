@@ -32,6 +32,7 @@
 
 ## chat commands (only work in local chat)
 ## NOTE: chalksmod and colorthreshold commands currently dont work
+**All commands use the `-` prefix**
 
 `abort` - deletes the canvase and stops execution fully.
 
