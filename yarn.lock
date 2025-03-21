@@ -14,7 +14,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@distube/ytdl-core@npm:^4.16.4":
+"@distube/ytdl-core@npm:4.16.4":
   version: 4.16.4
   resolution: "@distube/ytdl-core@npm:4.16.4"
   dependencies:
@@ -743,11 +743,11 @@ __metadata:
   linkType: hard
 
 "@types/node@npm:*, @types/node@npm:^22.13.10":
-  version: 22.13.10
-  resolution: "@types/node@npm:22.13.10"
+  version: 22.13.11
+  resolution: "@types/node@npm:22.13.11"
   dependencies:
     undici-types: "npm:~6.20.0"
-  checksum: 10c0/a3865f9503d6f718002374f7b87efaadfae62faa499c1a33b12c527cfb9fd86f733e1a1b026b80c5a0e4a965701174bc3305595a7d36078aa1abcf09daa5dee9
+  checksum: 10c0/f6ee33d36372242535c38640fe7550a6640d8a775ec19b55bfc11775b521cba072d892ca92a912332ce01b317293d645c1bf767f3f882ec719f2404a3d2a5b96
   languageName: node
   linkType: hard
 
@@ -2361,9 +2361,9 @@ __metadata:
   linkType: hard
 
 "undici@npm:^7.3.0":
-  version: 7.4.0
-  resolution: "undici@npm:7.4.0"
-  checksum: 10c0/0d8d8d627c87e72cf58148d257a79d019ce058b6761363ee5752103aa0ab57d132448fce4ef15171671ee138ef156a695ec1daeb72cd09ae408afa74dee070b5
+  version: 7.5.0
+  resolution: "undici@npm:7.5.0"
+  checksum: 10c0/07e1c984ff1d83516c02a716bb81abfa05087201e511c78147822073440365d2b8e875876804fb4e45857c11c412b46599c961f52aa5bdd2df481fa823e8b629
   languageName: node
   linkType: hard
 
@@ -2414,7 +2414,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "video-player@workspace:."
   dependencies:
-    "@distube/ytdl-core": "npm:^4.16.4"
+    "@distube/ytdl-core": "npm:4.16.4"
     "@ffmpeg-installer/ffmpeg": "npm:^1.1.0"
     "@types/fluent-ffmpeg": "npm:^2"
     "@types/node": "npm:^22.13.10"

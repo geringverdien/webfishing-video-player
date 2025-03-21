@@ -7,7 +7,7 @@ import { PassThrough } from "stream";
 import { Worker } from "worker_threads";
 import { fileURLToPath } from "url";
 
-const FRAMERATE = 24; // video target fps, doesnt have to match real video fps
+const FRAMERATE = 30; // video target fps, doesnt have to match real video fps
 const videoURL: string = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 
 const PORT = 24897;
