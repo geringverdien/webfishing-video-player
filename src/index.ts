@@ -1,14 +1,14 @@
 import { WebSocket } from "ws";
 import path from "path";
-import ytdl from "@distube/ytdl-core";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import { PassThrough } from "stream";
 import { Worker } from "worker_threads";
 import { fileURLToPath } from "url";
+import { createReadStream } from "fs";
 
 const FRAMERATE = 30; // video target fps, doesnt have to match real video fps
-const videoURL: string = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+const VIDEOFILE: string = "./video.mp4";
 
 const PORT = 24897;
 const WIDTH = 200, HEIGHT = 200; // 200,200 for 1 canvas, 400,400 for 2 canvases
@@ -98,7 +98,7 @@ const __dirname = path.dirname(__filename);
 var usedColorPalette = useChalksColorPalette ? chalksModColorPalette : vanillaColorPalette;
 const socket = new WebSocket("ws://127.0.0.1:" + PORT.toString());
 console.log("downloading video...")
-const videoStream = ytdl(videoURL, { quality: "lowestvideo" });
+const videoStream = createReadStream(VIDEOFILE);
 console.log("video downloaded")
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 

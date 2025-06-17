@@ -14,18 +14,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@distube/ytdl-core@npm:4.16.4":
-  version: 4.16.4
-  resolution: "@distube/ytdl-core@npm:4.16.4"
+"@distube/ytdl-core@npm:4.16.12":
+  version: 4.16.12
+  resolution: "@distube/ytdl-core@npm:4.16.12"
   dependencies:
-    http-cookie-agent: "npm:^6.0.8"
+    http-cookie-agent: "npm:^7.0.1"
     https-proxy-agent: "npm:^7.0.6"
     m3u8stream: "npm:^0.8.6"
     miniget: "npm:^4.2.3"
     sax: "npm:^1.4.1"
-    tough-cookie: "npm:^5.1.0"
-    undici: "npm:^7.3.0"
-  checksum: 10c0/cdafb689966162e11e8f9ddacff1c4748d092cfcbe9191408c30a5534c5260132125f2cf151305cb15ae8f42f405ec9a93933fda5ee1fa401419378a9b1ba80f
+    tough-cookie: "npm:^5.1.2"
+    undici: "npm:^7.8.0"
+  checksum: 10c0/f9a7e51b4961c05f60070a490fc6368f12557e65dc98e694560d396d5caeb250f8c98a9b3485a2d720aba406bc5dec94bd04056d5f637aec4f0a08169573e7ff
   languageName: node
   linkType: hard
 
@@ -1362,18 +1362,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"http-cookie-agent@npm:^6.0.8":
-  version: 6.0.8
-  resolution: "http-cookie-agent@npm:6.0.8"
+"http-cookie-agent@npm:^7.0.1":
+  version: 7.0.1
+  resolution: "http-cookie-agent@npm:7.0.1"
   dependencies:
     agent-base: "npm:^7.1.3"
   peerDependencies:
     tough-cookie: ^4.0.0 || ^5.0.0
-    undici: ^5.11.0 || ^6.0.0
+    undici: ^7.0.0
   peerDependenciesMeta:
     undici:
       optional: true
-  checksum: 10c0/d1931431982f5946e10cd67cd035d510119acce046db9588e38c3d37385b40b5fa4a757fd97d79e457f2a91546d3b95743511ac99e9fc6b825d1063299b04b58
+  checksum: 10c0/d89b44247a00a38891ffd8398b5ba57e891cd8ac638eff57d2b11cbff525dad207f3058dbfff9d19678e646c891252195f90ef8f61e7ddcfbfae6a1b97b2be5e
   languageName: node
   linkType: hard
 
@@ -2263,7 +2263,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tough-cookie@npm:^5.1.0":
+"tough-cookie@npm:^5.1.2":
   version: 5.1.2
   resolution: "tough-cookie@npm:5.1.2"
   dependencies:
@@ -2360,10 +2360,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"undici@npm:^7.3.0":
-  version: 7.5.0
-  resolution: "undici@npm:7.5.0"
-  checksum: 10c0/07e1c984ff1d83516c02a716bb81abfa05087201e511c78147822073440365d2b8e875876804fb4e45857c11c412b46599c961f52aa5bdd2df481fa823e8b629
+"undici@npm:^7.8.0":
+  version: 7.10.0
+  resolution: "undici@npm:7.10.0"
+  checksum: 10c0/756ac876a8df845bc89eb8348c35d33a0ff63c17eb45b664075c961a7fbd4a398f94f9dce438262f55fe66e4bbb0a46aa63a3fd58ce51361c616aff11a270450
   languageName: node
   linkType: hard
 
@@ -2414,7 +2414,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "video-player@workspace:."
   dependencies:
-    "@distube/ytdl-core": "npm:4.16.4"
+    "@distube/ytdl-core": "npm:4.16.12"
     "@ffmpeg-installer/ffmpeg": "npm:^1.1.0"
     "@types/fluent-ffmpeg": "npm:^2"
     "@types/node": "npm:^22.13.10"
